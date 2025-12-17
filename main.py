@@ -2818,6 +2818,8 @@ with tab_otimizacao:
         st.session_state.ultima_otimizacao = None
     if 'ajustes_realizados' not in st.session_state:
         st.session_state.ajustes_realizados = []
+    if 'fontes_busca_web' not in st.session_state:
+        st.session_state.fontes_busca_web = ""
     
     # Área para entrada do conteúdo
     texto_para_otimizar = st.text_area("Cole o conteúdo para otimização:", height=300)
@@ -2855,37 +2857,105 @@ with tab_otimizacao:
         height=80
     )
 
+    # --- FUNÇÃO DE BUSCA WEB SEPARADA ---
+    def realizar_busca_web_perplexity(texto, tipo_otimizacao, tom_voz):
+        """Função separada para realizar busca web"""
+        try:
+            # Importar dentro da função para evitar erros de importação
+            from perplexity import Perplexity
+            
+            # Obter API key
+            perp_api_key = os.getenv("PERP_API_KEY")
+            if not perp_api_key:
+                return "❌ ERRO: PERP_API_KEY não encontrada nas variáveis de ambiente"
+            
+            # Inicializar cliente
+            client = Perplexity(api_key=perp_api_key)
+            
+            # Construir prompt para busca
+            prompt = f"""
+            Analise este conteúdo agrícola e forneça informações técnicas atualizadas para enriquecê-lo:
+
+            **TEXTO BASE:**
+            {texto[:800]}
+
+            **CONTEXTO DA OTIMIZAÇÃO:**
+            - Tipo: {tipo_otimizacao}
+            - Tom: {tom_voz}
+
+            **FORNECER:**
+            1. DADOS TÉCNICOS ATUALIZADOS (últimos 3 anos)
+            2. ESTATÍSTICAS RELEVANTES do setor agrícola
+            3. FONTES CONFIÁVEIS (Embrapa, universidades, pesquisas)
+            4. INFORMAÇÕES PARA MELHORAR {tipo_otimizacao}
+            5. EXEMPLOS PRÁTICOS aplicáveis
+
+            Formato de resposta: Bullet points claros com fontes.
+            """
+            
+            # Fazer busca
+            response = client.chat.completions.create(
+                model="sonar",
+                messages=[
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.1,
+                max_tokens=2000
+            )
+            
+            if response and response.choices:
+                resultado = response.choices[0].message.content
+                return resultado
+            else:
+                return "❌ ERRO: Nenhuma resposta recebida do Perplexity"
+                
+        except ImportError as e:
+            return f"❌ ERRO: Biblioteca perplexity-api não instalada. Execute: pip install perplexity-api\nDetalhes: {str(e)}"
+        except Exception as e:
+            return f"❌ ERRO na busca web: {str(e)}"
+
     # Botão de otimização
     if st.button("🚀 Otimizar Conteúdo", type="primary", use_container_width=True):
         if texto_para_otimizar:
-            with st.spinner("Otimizando conteúdo com busca web..."):
+            with st.spinner("Processando otimização..."):
                 try:
-                    # FASE 1: BUSCA WEB (se ativada)
+                    # FASE 1: BUSCA WEB (se ativada) - AGORA COM TRATAMENTO SEPARADO
                     fontes_encontradas = ""
                     if usar_busca_web:
-                        st.info("🔍 Buscando informações atualizadas e técnicas...")
-                        
-                        # Construir query de busca baseada no conteúdo
-                        query_base = f"""
-                        Informações técnicas atualizadas e fontes confiáveis:
-                        
-                        CONTEÚDO PARA OTIMIZAR:
-                        {texto_para_otimizar[:300]}
-                        
-            
-           
-                        
-                        Seja conciso e direto. Liste as informações em tópicos claros.
-                        """
-                        
-                        # Buscar fontes relevantes usando Perplexity
-                        resultado_busca = buscar_perplexity(query_base)
-                        
-                        if resultado_busca and not resultado_busca.startswith("❌"):
-                            fontes_encontradas = resultado_busca
-                            st.success(f"✅ Fontes técnicas encontradas")
-                        else:
-                            st.warning("⚠️ Busca web não retornou resultados. Continuando sem fontes externas.")
+                        # Container separado para busca web
+                        with st.container():
+                            st.info("🔍 Iniciando busca web no Perplexity...")
+                            
+                            # Criar um placeholder para os resultados
+                            busca_placeholder = st.empty()
+                            
+                            # Executar busca web em um bloco try separado
+                            try:
+                                resultado_busca = realizar_busca_web_perplexity(
+                                    texto_para_otimizar, 
+                                    tipo_otimizacao, 
+                                    tom_voz
+                                )
+                                
+                                # Verificar resultado
+                                if resultado_busca and not resultado_busca.startswith("❌"):
+                                    fontes_encontradas = resultado_busca
+                                    st.session_state.fontes_busca_web = resultado_busca
+                                    busca_placeholder.success(f"✅ Busca web concluída: {len(resultado_busca.split())} palavras encontradas")
+                                    
+                                    # Mostrar preview
+                                    with st.expander("📋 Prévia das fontes encontradas", expanded=False):
+                                        st.markdown(resultado_busca[:1000] + "..." if len(resultado_busca) > 1000 else resultado_busca)
+                                else:
+                                    busca_placeholder.warning("⚠️ Busca web não retornou resultados válidos")
+                                    st.info("⚠️ Continuando sem fontes externas da busca web")
+                                    
+                            except Exception as busca_error:
+                                busca_placeholder.error(f"❌ Erro na busca web: {str(busca_error)}")
+                                st.info("⚠️ Continuando sem fontes externas da busca web")
+                    
+                    # FASE 2: OTIMIZAÇÃO COM GEMINI
+                    st.info("🤖 Iniciando otimização com Gemini...")
                     
                     # Contexto do agente
                     contexto_agente = ""
@@ -2893,216 +2963,172 @@ with tab_otimizacao:
                         agente = st.session_state.agente_selecionado
                         contexto_agente = construir_contexto(agente, st.session_state.segmentos_selecionados)
                     
-                    # Prompt de otimização COMPLETO
+                    # Prompt de otimização
                     prompt = f"""
                     {contexto_agente}
 
-                    ## TAREFA: OTIMIZAR CONTEÚDO SEGUINDO TODAS AS ESPECIFICAÇÕES
+                    ## TAREFA: OTIMIZAR CONTEÚDO COM ESPECIFICAÇÕES
 
-                    **TEXTO ORIGINAL PARA OTIMIZAÇÃO:**
+                    **TEXTO ORIGINAL:**
                     {texto_para_otimizar}
 
-                    **FONTES TÉCNICAS DA BUSCA WEB:**
-                    {fontes_encontradas if fontes_encontradas else "Nenhuma fonte adicional encontrada na busca web."}
+                    **FONTES DA BUSCA WEB (se disponíveis):**
+                    {fontes_encontradas if fontes_encontradas else "Nenhuma fonte externa disponível."}
 
                     **INSTRUÇÕES DO BRIEFING:**
                     {instrucoes_briefing if instrucoes_briefing else 'Sem briefing específico'}
 
                     **CONFIGURAÇÕES:**
-                    - Tipo de otimização: {tipo_otimizacao}
-                    - Tom de voz: {tom_voz}
-                    - Nível de heading solicitado: {nivel_heading}
-                    - Incluir links internos: {"Sim" if incluir_links_internos else "Não"}
-                    - Busca web utilizada: {"Sim" if usar_busca_web else "Não"}
+                    - Tipo: {tipo_otimizacao}
+                    - Tom: {tom_voz}
+                    - Heading level: {nivel_heading}
+                    - Links internos: {"Sim" if incluir_links_internos else "Não"}
+                    - Busca web usada: {"Sim" if fontes_encontradas else "Não"}
 
-                    ## ESPECIFICAÇÕES OBRIGATÓRIAS:
+                    ## REQUISITOS OBRIGATÓRIOS:
 
-                    1. **SUGESTÕES DE TITLES E DESCRIPTIONS (OBRIGATÓRIO):**
-                       - Gere 3 opções de meta title (máx 60 caracteres cada)
-                       - Gere 3 opções de meta description (máx 155 caracteres cada)
-                       - Inclua palavras-chave principais
-                       - Title deve ter chamada para ação
-                       - Description deve ser atrativa e incluir benefício
+                    1. **TITLES E DESCRIPTIONS (OBRIGATÓRIO):**
+                       Gere 3 opções de meta title (≤60 chars) e description (≤155 chars)
+                       Exemplo:
+                       Title: Guia Prático de Adubação Nitrogenada no Milho - Aumente sua Produtividade
+                       Description: Descubra como a adubação nitrogenada adequada pode aumentar em até 30% a produtividade do milho. Técnicas comprovadas!
 
-                    2. **BULLETS QUANDO APLICÁVEL EM SEO:**
-                       - Para listas de benefícios: use bullets
-                       - Para características técnicas: use bullets
-                       - Para etapas de processo: use bullets
-                       - Para comparativos: use bullets
-                       - Limite de 3-5 itens por lista
-                       - Cada bullet: máximo 1 linha
+                    2. **BULLETS QUANDO APLICÁVEL:**
+                       - Use bullets para listas de benefícios
+                       - Use bullets para características técnicas
+                       - Use bullets para etapas de processo
+                       - Máximo 5 itens por lista
 
-                    3. **NÍVEL DE HEADING DA TAG (CORREÇÃO OBRIGATÓRIA):**
-                       - Verifique níveis de heading no conteúdo original
-                       - Corrija se usar H4 quando foi solicitado {nivel_heading}
+                    3. **HEADING LEVEL {nivel_heading}:**
                        - Todos os headings principais devem ser {nivel_heading}
-                       - Sub-headings devem seguir hierarquia apropriada
+                       - Corrigir se estiver usando nível diferente
+                       - Manter hierarquia consistente
 
-                    4. **CORREÇÕES AUTOMÁTICAS (TODAS DEVEM SER APLICADAS):**
-                       - Reescreva introduções genéricas
-                       - Quebre parágrafos longos (máx 3-4 frases)
-                       - Remova informações duplicadas
-                       - Remova tópicos fora do briefing
+                    4. **CORREÇÕES AUTOMÁTICAS:**
+                       - Remova introduções genéricas
+                       - Quebre parágrafos longos (3-4 frases máx)
+                       - Remova repetições
                        - Melhore escaneabilidade
-                       - Divida frases muito longas
-                       - Reforce público-alvo
-                       - Use dados da busca web quando disponíveis
+                       - Divida frases complexas
+                       - Incorpore dados das fontes quando relevante
 
                     5. **LINKS INTERNOS (se solicitado):**
-                       - Sugira 3-5 links internos relevantes
-                       - Formato: [Texto âncora](URL) - inserir naturalmente no texto
+                       Sugira 3-5 links relevantes no formato: [texto âncora](url)
 
-                    ## FORMATO DE SAÍDA OBRIGATÓRIO:
+                    ## FORMATO DE RESPOSTA:
 
-                    ### 📊 SUGESTÕES DE TITLES E DESCRIPTIONS
+                    ### 📊 SUGESTÕES DE META TAGS
 
-                    **Opção 1 (Recomendada):**
-                    Title: [title com até 60 caracteres]
-                    Description: [description com até 155 caracteres]
+                    **OPÇÃO 1 (RECOMENDADA):**
+                    Title: [máx 60 caracteres]
+                    Description: [máx 155 caracteres]
 
-                    **Opção 2:**
-                    Title: [title com até 60 caracteres]
-                    Description: [description com até 155 caracteres]
+                    **OPÇÃO 2:**
+                    Title: [máx 60 caracteres]
+                    Description: [máx 155 caracteres]
 
-                    **Opção 3:**
-                    Title: [title com até 60 caracteres]
-                    Description: [description com até 155 caracteres]
+                    **OPÇÃO 3:**
+                    Title: [máx 60 caracteres]
+                    Description: [máx 155 caracteres]
 
                     ### ✅ CORREÇÕES APLICADAS
-                    [Liste cada correção aplicada com detalhes]
+                    [Liste todas as correções feitas]
 
-                    ### 🔗 LINKS INTERNOS SUGERIDOS (se aplicável)
-                    [Liste 3-5 links internos com contexto]
+                    ### 🔗 LINKS INTERNOS SUGERIDOS
+                    [Liste links se solicitado]
 
-                    ### 📝 CONTEÚDO OTIMIZADO (COM TODAS AS CORREÇÕES)
-                    [AQUI O CONTEÚDO COMPLETO OTIMIZADO com:
-                    - Meta title e description selecionadas (usar a Opção 1 no início)
-                    - Bullet points onde aplicável em SEO
-                    - Headings corrigidos para {nivel_heading}
-                    - Todas as correções aplicadas
-                    - Fontes ancoradas quando usar dados da busca web
-                    - Links internos inseridos (se solicitado)]
+                    ### 📝 CONTEÚDO OTIMIZADO
+                    [Conteúdo completo otimizado]
 
-                    Aplique TODAS as especificações acima automaticamente.
+                    IMPORTANTE: Aplique TODAS as correções automaticamente.
                     """
 
+                    # Gerar otimização
                     resposta = modelo_texto.generate_content(prompt)
                     resultado = resposta.text
                     
                     # Processar resultado
-                    partes_do_resultado = {}
+                    partes_do_resultado = {
+                        "📝 CONTEÚDO OTIMIZADO": resultado  # Default
+                    }
                     
-                    # Extrair seções
-                    if "### 📊 SUGESTÕES DE TITLES E DESCRIPTIONS" in resultado:
-                        partes = resultado.split("### 📊 SUGESTÕES DE TITLES E DESCRIPTIONS")
-                        if len(partes) > 1:
-                            meta_part = partes[1]
-                            if "### ✅ CORREÇÕES APLICADAS" in meta_part:
-                                meta_section = meta_part.split("### ✅ CORREÇÕES APLICADAS")[0]
-                                partes_do_resultado["📊 SUGESTÕES DE TITLES E DESCRIPTIONS"] = meta_section.strip()
+                    # Tentar extrair seções
+                    secoes = ["📊 SUGESTÕES DE META TAGS", "✅ CORREÇÕES APLICADAS", "🔗 LINKS INTERNOS SUGERIDOS", "📝 CONTEÚDO OTIMIZADO"]
+                    
+                    for i in range(len(secoes)):
+                        if secoes[i] in resultado:
+                            inicio = resultado.find(secoes[i])
+                            if i < len(secoes) - 1 and secoes[i+1] in resultado:
+                                fim = resultado.find(secoes[i+1])
+                                conteudo = resultado[inicio + len(secoes[i]):fim].strip()
+                            else:
+                                conteudo = resultado[inicio + len(secoes[i]):].strip()
                             
-                            # Extrair correções
-                            if "### ✅ CORREÇÕES APLICADAS" in partes[1]:
-                                corr_part = partes[1].split("### ✅ CORREÇÕES APLICADAS")[1]
-                                if "### 🔗 LINKS INTERNOS SUGERIDOS" in corr_part:
-                                    corr_section = corr_part.split("### 🔗 LINKS INTERNOS SUGERIDOS")[0]
-                                    partes_do_resultado["✅ CORREÇÕES APLICADAS"] = corr_section.strip()
-                                    
-                                    # Extrair links
-                                    links_part = corr_part.split("### 🔗 LINKS INTERNOS SUGERIDOS")[1]
-                                    if "### 📝 CONTEÚDO OTIMIZADO" in links_part:
-                                        links_section = links_part.split("### 📝 CONTEÚDO OTIMIZADO")[0]
-                                        partes_do_resultado["🔗 LINKS INTERNOS SUGERIDOS"] = links_section.strip()
-                                        
-                                        # Extrair conteúdo
-                                        content_part = links_part.split("### 📝 CONTEÚDO OTIMIZADO")[1]
-                                        partes_do_resultado["📝 CONTEÚDO OTIMIZADO"] = content_part.strip()
-                    
-                    # Se não extraiu corretamente, usar resultado completo
-                    if not partes_do_resultado:
-                        partes_do_resultado["📝 CONTEÚDO OTIMIZADO"] = resultado
+                            # Limpar formatação extra
+                            conteudo = conteudo.strip(":#*-\n ")
+                            partes_do_resultado[secoes[i]] = conteudo
                     
                     # Salvar no session state
                     st.session_state.conteudo_otimizado = partes_do_resultado.get("📝 CONTEÚDO OTIMIZADO", resultado)
                     st.session_state.ultima_otimizacao = resultado
                     st.session_state.texto_original = texto_para_otimizar
-                    st.session_state.fontes_encontradas = fontes_encontradas
+                    st.session_state.fontes_busca_web = fontes_encontradas
                     st.session_state.partes_resultado = partes_do_resultado
                     
                     # Exibir resultados
-                    st.success("✅ Conteúdo otimizado com todas as especificações!")
+                    st.success("✅ Conteúdo otimizado com sucesso!")
                     
-                    # 1. Mostrar Meta Tags (OBRIGATÓRIO)
-                    st.subheader("📊 Sugestões de Titles e Descriptions (Obrigatório)")
-                    if "📊 SUGESTÕES DE TITLES E DESCRIPTIONS" in partes_do_resultado:
-                        st.markdown(partes_do_resultado["📊 SUGESTÕES DE TITLES E DESCRIPTIONS"])
-                        
-                        # Extrair a primeira opção para usar no conteúdo
-                        meta_content = partes_do_resultado["📊 SUGESTÕES DE TITLES E DESCRIPTIONS"]
-                        if "**Opção 1 (Recomendada):**" in meta_content:
-                            # Tentar extrair title e description da opção 1
-                            lines = meta_content.split('\n')
-                            for i, line in enumerate(lines):
-                                if "Title:" in line:
-                                    meta_title = line.replace("Title:", "").strip()
-                                if "Description:" in line:
-                                    meta_description = line.replace("Description:", "").strip()
-                                    break
+                    # 1. Meta Tags
+                    st.subheader("📊 Meta Tags Geradas")
+                    if "📊 SUGESTÕES DE META TAGS" in partes_do_resultado:
+                        st.markdown(partes_do_resultado["📊 SUGESTÕES DE META TAGS"])
                     else:
-                        st.warning("Meta tags não foram geradas no formato esperado")
-                        # Tentar encontrar meta tags no resultado completo
+                        # Procurar meta tags no texto
                         lines = resultado.split('\n')
-                        meta_found = []
+                        meta_candidates = []
                         for line in lines:
-                            if 'title' in line.lower() or 'description' in line.lower() or 'meta' in line.lower():
-                                meta_found.append(line)
-                        if meta_found:
-                            st.info("Possíveis meta tags encontradas:")
-                            for line in meta_found[:6]:
+                            line_lower = line.lower()
+                            if ('title:' in line_lower or 'description:' in line_lower or 
+                                'meta ' in line_lower or 'tag' in line_lower):
+                                meta_candidates.append(line)
+                        
+                        if meta_candidates:
+                            st.info("Meta tags encontradas:")
+                            for line in meta_candidates[:6]:
                                 st.write(line)
+                        else:
+                            st.warning("Meta tags não foram detectadas automaticamente")
                     
-                    # 2. Mostrar Correções Aplicadas
+                    # 2. Correções
                     if "✅ CORREÇÕES APLICADAS" in partes_do_resultado:
-                        with st.expander("✅ Correções Aplicadas (Detalhado)", expanded=True):
+                        with st.expander("✅ Correções Aplicadas", expanded=True):
                             st.markdown(partes_do_resultado["✅ CORREÇÕES APLICADAS"])
                     
-                    # 3. Mostrar Busca Web (se aplicável)
-                    if fontes_encontradas and usar_busca_web:
-                        with st.expander("🔍 Fontes Encontradas na Busca Web"):
-                            st.markdown(fontes_encontradas)
-                    
-                    # 4. Mostrar Links Internos (se aplicável)
+                    # 3. Links Internos
                     if "🔗 LINKS INTERNOS SUGERIDOS" in partes_do_resultado and incluir_links_internos:
-                        with st.expander("🔗 Links Internos Sugeridos"):
+                        with st.expander("🔗 Links Sugeridos"):
                             st.markdown(partes_do_resultado["🔗 LINKS INTERNOS SUGERIDOS"])
                     
-                    # 5. Mostrar Conteúdo Otimizado
-                    st.subheader("📝 Conteúdo Otimizado (Com Todas as Correções)")
+                    # 4. Conteúdo Otimizado
+                    st.subheader("📝 Conteúdo Otimizado")
                     conteudo_final = partes_do_resultado.get("📝 CONTEÚDO OTIMIZADO", resultado)
                     st.markdown(conteudo_final)
                     
-                    # Verificar especificações críticas
-                    st.subheader("🔍 Verificação de Especificações")
+                    # Verificações
+                    st.subheader("🔍 Verificação")
                     
-                    col_check1, col_check2, col_check3 = st.columns(3)
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        bullets = conteudo_final.count("- ") + conteudo_final.count("* ")
+                        st.metric("Bullet Points", bullets)
+                    with col2:
+                        has_heading = nivel_heading.lower() in conteudo_final.lower()
+                        st.metric(f"Heading {nivel_heading}", "✅" if has_heading else "❌")
+                    with col3:
+                        has_meta = 'title' in conteudo_final[:500].lower() or 'description' in conteudo_final[:500].lower()
+                        st.metric("Meta Tags", "✅" if has_meta else "❌")
                     
-                    with col_check1:
-                        # Verificar meta tags
-                        meta_found = 'title' in conteudo_final.lower() or 'description' in conteudo_final.lower()
-                        st.metric("Meta Tags", "✅ Geradas" if meta_found else "⚠️ Verificar")
-                    
-                    with col_check2:
-                        # Verificar bullets (contar no conteúdo)
-                        bullet_count = conteudo_final.count("- ") + conteudo_final.count("* ")
-                        st.metric("Bullet Points", bullet_count)
-                    
-                    with col_check3:
-                        # Verificar heading level
-                        heading_correct = nivel_heading.lower() in conteudo_final.lower()
-                        st.metric(f"Heading {nivel_heading}", 
-                                "✅ Presente" if heading_correct else "⚠️ Verificar")
-                    
-                    # Botão de download
+                    # Download
                     st.download_button(
                         "💾 Baixar Conteúdo Otimizado",
                         data=conteudo_final,
@@ -3110,19 +3136,11 @@ with tab_otimizacao:
                         mime="text/plain"
                     )
                     
-                    # Botão para download das meta tags separadas
-                    if "📊 SUGESTÕES DE TITLES E DESCRIPTIONS" in partes_do_resultado:
-                        st.download_button(
-                            "📋 Baixar Apenas Meta Tags",
-                            data=partes_do_resultado["📊 SUGESTÕES DE TITLES E DESCRIPTIONS"],
-                            file_name=f"meta_tags_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
-                            mime="text/plain"
-                        )
-                
                 except Exception as e:
-                    st.error(f"Erro na otimização: {str(e)}")
+                    st.error(f"❌ Erro na otimização: {str(e)}")
+                    st.info("Dica: Verifique sua conexão com a API do Gemini")
         else:
-            st.warning("Cole um conteúdo para otimizar")
+            st.warning("Por favor, cole um conteúdo para otimizar")
 
     # Ajustes incrementais
     if st.session_state.conteudo_otimizado:
@@ -3132,93 +3150,38 @@ with tab_otimizacao:
         comando_ajuste = st.text_area(
             "Ajustes desejados:",
             height=80,
-            placeholder="""Exemplos:
-- Adicione mais bullet points para benefícios
-- Corrija todos os headings para H3
-- Melhore as meta tags
-- Adicione mais dados técnicos
-- Simplifique a linguagem"""
+            placeholder="Ex: Adicione mais bullets, corrija headings, melhore meta tags...",
+            key="ajuste_text"
         )
         
-        if st.button("🔄 Aplicar Ajustes"):
+        if st.button("🔄 Aplicar Ajustes", key="btn_ajuste"):
             if comando_ajuste:
                 with st.spinner("Aplicando ajustes..."):
                     try:
-                        historico = ""
-                        if st.session_state.ajustes_realizados:
-                            historico = "**Histórico de ajustes:**\n"
-                            for i, a in enumerate(st.session_state.ajustes_realizados, 1):
-                                historico += f"{i}. {a}\n"
-                        
                         prompt_ajuste = f"""
-                        ## AJUSTE INCREMENTAL COM ESPECIFICAÇÕES
-
-                        **CONTEÚDO ATUAL (JÁ OTIMIZADO):**
-                        {st.session_state.conteudo_otimizado}
-
-                        **CONFIGURAÇÕES ORIGINAIS:**
-                        - Tipo: {tipo_otimizacao}
-                        - Tom: {tom_voz}
-                        - Heading solicitado: {nivel_heading}
-                        - Meta tags obrigatórias: SIM
-                        - Bullets quando aplicável: SIM
-
-                        {historico}
-
-                        **NOVOS AJUSTES SOLICITADOS:**
-                        {comando_ajuste}
-
-                        **REGRAS DE AJUSTE (MANTENHA):**
-                        1. Meta tags devem ser mantidas ou melhoradas
-                        2. Bullet points devem ser usados quando aplicável
-                        3. Heading level {nivel_heading} deve ser mantido
-                        4. Parágrafos curtos (3-4 frases máx)
-                        5. Escaneabilidade preservada
-
-                        **FORMATO DE RESPOSTA:**
-                        ### ✅ AJUSTES APLICADOS:
-                        [Liste ajustes aplicados]
-
-                        ### 📊 META TAGS ATUALIZADAS (se necessário):
-                        [Meta title e description atualizadas]
-
-                        ### 📝 CONTEÚDO ATUALIZADO:
-                        [Conteúdo completo com ajustes aplicados]
-
-                        Aplique os ajustes mantendo TODAS as especificações anteriores.
+                        **CONTEÚDO ATUAL:** {st.session_state.conteudo_otimizado[:1000]}
+                        
+                        **AJUSTES SOLICITADOS:** {comando_ajuste}
+                        
+                        **MANTENHA:** 
+                        - Meta tags existentes
+                        - Heading level {nivel_heading}
+                        - Bullets onde aplicável
+                        
+                        Aplique os ajustes e retorne APENAS o conteúdo atualizado.
                         """
-
-                        resposta_ajuste = modelo_texto.generate_content(prompt_ajuste)
-                        resultado_ajuste = resposta_ajuste.text
                         
-                        # Extrair conteúdo atualizado
-                        if "### 📝 CONTEÚDO ATUALIZADO:" in resultado_ajuste:
-                            partes = resultado_ajuste.split("### 📝 CONTEÚDO ATUALIZADO:")
-                            if len(partes) > 1:
-                                conteudo_atualizado = partes[1].strip()
-                            else:
-                                conteudo_atualizado = resultado_ajuste.strip()
-                        else:
-                            conteudo_atualizado = resultado_ajuste.strip()
-                        
-                        # Atualizar session state
-                        st.session_state.conteudo_otimizado = conteudo_atualizado
+                        resposta = modelo_texto.generate_content(prompt_ajuste)
+                        st.session_state.conteudo_otimizado = resposta.text
                         st.session_state.ajustes_realizados.append(comando_ajuste)
                         
-                        st.success("✅ Ajustes aplicados mantendo especificações")
-                        st.markdown(conteudo_atualizado)
-                        
-                        st.download_button(
-                            "💾 Baixar Versão Atualizada",
-                            data=conteudo_atualizado,
-                            file_name=f"conteudo_ajustado_{len(st.session_state.ajustes_realizados)}_v_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
-                            mime="text/plain"
-                        )
+                        st.success("✅ Ajustes aplicados!")
+                        st.markdown(resposta.text)
                         
                     except Exception as e:
-                        st.error(f"Erro ao aplicar ajustes: {str(e)}")
+                        st.error(f"Erro: {str(e)}")
             else:
-                st.warning("Digite ajustes desejados")
+                st.warning("Digite os ajustes desejados")
         
         # Limpar histórico
         if st.button("🗑️ Limpar Histórico de Ajustes"):
