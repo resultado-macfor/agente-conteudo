@@ -1219,7 +1219,7 @@ Pontos-chave: [lista os principais pontos]""")
         
         tom_voz = st.selectbox("Tom de Voz:", 
                               ["Formal", "Informal", "Persuasivo", "Educativo", 
-                               "Inspirador", "Técnico", "Jornalístico"])
+                               "Inspirador", "Técnico", "Jornalístico"], key = 'qq')
         
         palavras_chave = st.text_input("Palavras-chave (opcional):",
                                       placeholder="separadas por vírgula")
@@ -1572,7 +1572,7 @@ O Mais Agro é uma plataforma de conteúdo especializado em agronegócio, trazen
         
         # Configurações de estilo
         st.subheader("🎨 Configurações de Estilo")
-        tom_voz = st.selectbox("Tom de Voz:", ["Jornalístico", "Especialista Técnico", "Educativo", "Persuasivo"])
+        tom_voz = st.selectbox("Tom de Voz:", ["Jornalístico", "Especialista Técnico", "Educativo", "Persuasivo"], key = 'uu')
         nivel_tecnico = st.selectbox("Nível Técnico:", ["Básico", "Intermediário", "Avançado"])
         abordagem_problema = st.text_area("Aborde o problema de tal forma que:", "seja claro, técnico e focando na solução prática para o produtor")
     
@@ -2890,7 +2890,7 @@ with tab_otimizacao:
     with col_config2:
         tom_voz = st.selectbox("Tom de Voz:", 
                               ["Formal", "Informal", "Persuasivo", "Educativo", 
-                               "Inspirador", "Técnico", "Jornalístico"])
+                               "Inspirador", "Técnico", "Jornalístico"], key ='oo')
         
         nivel_heading = st.selectbox("Nível de Heading:", 
                                    ["H1", "H2", "H3", "H4"],
