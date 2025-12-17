@@ -2842,10 +2842,10 @@ Forneça uma análise técnica detalhada baseada no conteúdo dessas URLs."""
         })
         
         data = {
-            "model": "sonar-medium-online", 
+            "model": "sonar", 
             "messages": messages,
             "max_tokens": 3000,
-            "temperature": 0.1
+            "temperature": 0.0
         }
         
         response = requests.post(
