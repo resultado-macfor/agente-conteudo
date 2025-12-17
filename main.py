@@ -2759,7 +2759,7 @@ with tab_revisao_tecnica:
 
 # ========== ABA: OTIMIZAÇÃO DE CONTEÚDO ==========
 # --- FUNÇÕES DE BUSCA WEB ---
-def buscar_perplexity(pergunta: str, contexto_agente: str = None) -> str:
+def buscar_perplexity(pergunta: str) -> str:
     """Realiza busca na web usando API do Perplexity"""
     try:
         if not perp_api_key:
@@ -2773,11 +2773,7 @@ def buscar_perplexity(pergunta: str, contexto_agente: str = None) -> str:
         # Construir o conteúdo da mensagem
         messages = []
         
-        if contexto_agente:
-            messages.append({
-                "role": "system", 
-                "content": f"Você é um assistente especializado. Contexto: {contexto_agente}"
-            })
+        
         
         messages.append({
             "role": "user",
@@ -2932,14 +2928,14 @@ with tab_otimizacao:
                         # Construir query de busca baseada no conteúdo
                         query_base = f"""
                         Forneça informações técnicas atualizadas e fontes confiáveis sobre: 
-                        {texto_para_otimizar[:500]}
+                        {texto_para_otimizar[:1000]}
                         
-                        Foco em: {tipo_otimizacao}
-                        Tom: {tom_voz}
+               
+                      
                         """
                         
                         # Buscar fontes relevantes
-                        resultado_busca = buscar_perplexity(query_base, contexto_busca)
+                        resultado_busca = buscar_perplexity(query_base)
                         
                         if resultado_busca and not resultado_busca.startswith("❌"):
                             fontes_encontradas = resultado_busca
