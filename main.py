@@ -2775,20 +2775,14 @@ def buscar_perplexity(prompt: str) -> str:
             messages=[
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.1  # Baixa temperatura para respostas mais precisas
+            temperature=0.0  # Baixa temperatura para respostas mais precisas
         )
         
         # Pegar a resposta
         resposta = response.choices[0].message.content
         
         # Adicionar informações da resposta
-        resposta_completa = f"""{resposta}
-
----
-**Informações da busca:**
-- Modelo usado: {response.model}
-- Tokens utilizados: {response.usage.total_tokens}
-- Busca concluída com sucesso"""
+        resposta_completa = f"""{resposta}"""
         
         return resposta_completa
         
@@ -2802,7 +2796,7 @@ def buscar_fontes_para_otimizacao(conteudo: str, tipo: str, tom: str) -> str:
         return "Busca web desativada"
     
     prompt = f"""
-    Para otimização de conteúdo agrícola, forneça:
+    Para otimização de conteúdo forneça:
     
     1. DADOS TÉCNICOS ATUALIZADOS para este conteúdo:
     {conteudo[:800]}
@@ -2889,21 +2883,13 @@ with tab_otimizacao:
                         
                         # Construir query de busca baseada no conteúdo
                         query_base = f"""
-                        Com base neste conteúdo agrícola, forneça informações técnicas atualizadas e fontes confiáveis:
+                        Informações técnicas atualizadas e fontes confiáveis:
                         
                         CONTEÚDO PARA OTIMIZAR:
-                        {texto_para_otimizar[:1000]}
+                        {texto_para_otimizar[:300]}
                         
-                        CONTEXTO DA OTIMIZAÇÃO:
-                        - Tipo de otimização: {tipo_otimizacao}
-                        - Tom de voz: {tom_voz}
-                        
-                        FORNECER:
-                        1. Estatísticas e dados atualizados relevantes para o conteúdo
-                        2. Fontes confiáveis (Embrapa, universidades, institutos de pesquisa)
-                        3. Informações técnicas precisas que possam enriquecer o conteúdo
-                        4. Dicas de SEO específicas para o setor agrícola (se aplicável)
-                        5. Exemplos de boas práticas mencionadas no conteúdo
+            
+           
                         
                         Seja conciso e direto. Liste as informações em tópicos claros.
                         """
