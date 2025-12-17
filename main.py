@@ -15,6 +15,15 @@ from typing import List, Dict
 import openai
 import pandas as pd
 import csv
+from perplexity import Perplexity
+
+# Configure a API key do Perplexity
+perp_api_key = os.getenv("PERP_API_KEY")
+if perp_api_key:
+    perplexity_client = Perplexity(api_key=perp_api_key)
+else:
+    st.warning("PERP_API_KEY não encontrada. Busca web estará desativada.")
+    perplexity_client = None
 
 # Configurações das credenciais
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
@@ -22,10 +31,6 @@ ASTRA_DB_API_ENDPOINT = os.getenv('ASTRA_DB_API_ENDPOINT')
 ASTRA_DB_APPLICATION_TOKEN = os.getenv('ASTRA_DB_APPLICATION_TOKEN')
 ASTRA_DB_NAMESPACE = os.getenv('ASTRA_DB_NAMESPACE')
 ASTRA_DB_COLLECTION = os.getenv('ASTRA_DB_COLLECTION')
-# Configuração da API do Perplexity
-perp_api_key = os.getenv("PERP_API_KEY")
-if not perp_api_key:
-    st.error("PERP_API_KEY não encontrada nas variáveis de ambiente")
 
 class AstraDBClient:
     def __init__(self):
@@ -2757,111 +2762,73 @@ with tab_revisao_tecnica:
         """)
 
 
-# ========== ABA: OTIMIZAÇÃO DE CONTEÚDO ==========
-# --- FUNÇÕES DE BUSCA WEB ---
-def buscar_perplexity(pergunta: str) -> str:
-    """Realiza busca na web usando API do Perplexity"""
+# --- FUNÇÃO ATUALIZADA PARA BUSCA WEB COM PERPLEXITY ---
+def buscar_perplexity(prompt: str) -> str:
+    """Realiza busca na web usando a biblioteca Perplexity"""
     try:
-        if not perp_api_key:
-            return "❌ API key do Perplexity não configurada"
-            
-        headers = {
-            "Authorization": f"Bearer {perp_api_key}",
-            "Content-Type": "application/json"
-        }
+        if not perplexity_available or perplexity_client is None:
+            return "❌ Cliente Perplexity não disponível"
         
-        # Construir o conteúdo da mensagem
-        messages = []
-        
-        
-        
-        messages.append({
-            "role": "user",
-            "content": f"{pergunta}\n\nForneça informações técnicas precisas e atualizadas com fontes confiáveis."
-        })
-        
-        data = {
-            "model": "sonar",
-            "messages": messages,
-            "max_tokens": 2000,
-            "temperature": 0.0
-        }
-        
-        response = requests.post(
-            "https://api.perplexity.ai/chat/completions",
-            headers=headers,
-            json=data,
-            timeout=30
+        # Enviar prompt para o Perplexity
+        response = perplexity_client.chat.completions.create(
+            model="sonar",
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.1  # Baixa temperatura para respostas mais precisas
         )
         
-        if response.status_code == 200:
-            result = response.json()
-            return result['choices'][0]['message']['content']
-        else:
-            return f"❌ Erro na busca: {response.status_code}"
-            
+        # Pegar a resposta
+        resposta = response.choices[0].message.content
+        
+        # Adicionar informações da resposta
+        resposta_completa = f"""{resposta}
+
+---
+**Informações da busca:**
+- Modelo usado: {response.model}
+- Tokens utilizados: {response.usage.total_tokens}
+- Busca concluída com sucesso"""
+        
+        return resposta_completa
+        
     except Exception as e:
-        return f"❌ Erro ao conectar com Perplexity: {str(e)}"
+        return f"❌ Erro na busca Perplexity: {str(e)}"
 
-def analisar_urls_perplexity(urls: List[str], pergunta: str, contexto_agente: str = None) -> str:
-    """Analisa URLs específicas usando Perplexity"""
-    try:
-        if not perp_api_key:
-            return "❌ API key do Perplexity não configurada"
-            
-        headers = {
-            "Authorization": f"Bearer {perp_api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        # Construir contexto com URLs
-        urls_contexto = "\n".join([f"- {url}" for url in urls])
-        
-        messages = []
-        
-        if contexto_agente:
-            messages.append({
-                "role": "system",
-                "content": f"Contexto do agente: {contexto_agente}"
-            })
-        
-        messages.append({
-            "role": "user", 
-            "content": f"""Analise estas URLs e responda à pergunta:
-
-URLs para análise:
-{urls_contexto}
-
-Pergunta: {pergunta}
-
-Forneça uma análise técnica detalhada baseada no conteúdo dessas URLs."""
-        })
-        
-        data = {
-            "model": "sonar", 
-            "messages": messages,
-            "max_tokens": 3000,
-            "temperature": 0.0
-        }
-        
-        response = requests.post(
-            "https://api.perplexity.ai/chat/completions",
-            headers=headers, 
-            json=data,
-            timeout=45
-        )
-        
-        if response.status_code == 200:
-            result = response.json()
-            return result['choices'][0]['message']['content']
-        else:
-            return f"❌ Erro na análise: {response.status_code}"
-            
-    except Exception as e:
-        return f"❌ Erro ao analisar URLs: {str(e)}"
+# --- FUNÇÃO ESPECÍFICA PARA OTIMIZAÇÃO DE CONTEÚDO ---
+def buscar_fontes_para_otimizacao(conteudo: str, tipo: str, tom: str) -> str:
+    """Busca fontes específicas para otimização de conteúdo agrícola"""
+    if not perplexity_available:
+        return "Busca web desativada"
+    
+    prompt = f"""
+    Para otimização de conteúdo agrícola, forneça:
+    
+    1. DADOS TÉCNICOS ATUALIZADOS para este conteúdo:
+    {conteudo[:800]}
+    
+    2. INFORMAÇÕES RELEVANTES para otimização tipo: {tipo}
+    
+    3. FONTES CONFIÁVEIS (cite especificamente):
+    - Embrapa (quais unidades/centros de pesquisa)
+    - Universidades (quais faculdades de agronomia)
+    - Institutos de pesquisa agrícola
+    - Dados oficiais (CONAB, IBGE, etc.)
+    
+    4. ESTATÍSTICAS RECENTES relacionadas ao tema
+    
+    5. BOAS PRÁTICAS comprovadas cientificamente
+    
+    Formato:
+    - Lista de tópicos claros
+    - Cada ponto com fonte específica
+    - Dados concretos e verificáveis
+    - Foco em informações úteis para enriquecer o conteúdo
+    """
+    
+    return buscar_perplexity(prompt)
         
 
-# ========== ABA: OTIMIZAÇÃO DE CONTEÚDO ==========
 # ========== ABA: OTIMIZAÇÃO DE CONTEÚDO ==========
 with tab_otimizacao:
     st.header("🚀 Otimização de Conteúdo")
@@ -2918,27 +2885,35 @@ with tab_otimizacao:
                     # FASE 1: BUSCA WEB (se ativada)
                     fontes_encontradas = ""
                     if usar_busca_web:
-                        st.info("🔍 Buscando fontes relevantes na web...")
+                        st.info("🔍 Buscando informações atualizadas e técnicas...")
                         
                         # Construir query de busca baseada no conteúdo
                         query_base = f"""
-                        Forneça informações técnicas atualizadas e fontes confiáveis sobre o seguinte conteúdo agrícola/agrícola:
+                        Com base neste conteúdo agrícola, forneça informações técnicas atualizadas e fontes confiáveis:
                         
-                        {texto_para_otimizar[:800]}
+                        CONTEÚDO PARA OTIMIZAR:
+                        {texto_para_otimizar[:1000]}
                         
-                        Foco em: {tipo_otimizacao}
-                        Tom: {tom_voz}
+                        CONTEXTO DA OTIMIZAÇÃO:
+                        - Tipo de otimização: {tipo_otimizacao}
+                        - Tom de voz: {tom_voz}
                         
-                        Forneça dados concretos, estatísticas atualizadas, informações técnicas precisas.
-                        Inclua nomes de fontes confiáveis como Embrapa, universidades, institutos de pesquisa.
+                        FORNECER:
+                        1. Estatísticas e dados atualizados relevantes para o conteúdo
+                        2. Fontes confiáveis (Embrapa, universidades, institutos de pesquisa)
+                        3. Informações técnicas precisas que possam enriquecer o conteúdo
+                        4. Dicas de SEO específicas para o setor agrícola (se aplicável)
+                        5. Exemplos de boas práticas mencionadas no conteúdo
+                        
+                        Seja conciso e direto. Liste as informações em tópicos claros.
                         """
                         
-                        # Buscar fontes relevantes
+                        # Buscar fontes relevantes usando Perplexity
                         resultado_busca = buscar_perplexity(query_base)
                         
                         if resultado_busca and not resultado_busca.startswith("❌"):
                             fontes_encontradas = resultado_busca
-                            st.success("✅ Fontes relevantes encontradas")
+                            st.success(f"✅ Fontes técnicas encontradas")
                         else:
                             st.warning("⚠️ Busca web não retornou resultados. Continuando sem fontes externas.")
                     
@@ -2948,16 +2923,16 @@ with tab_otimizacao:
                         agente = st.session_state.agente_selecionado
                         contexto_agente = construir_contexto(agente, st.session_state.segmentos_selecionados)
                     
-                    # Prompt de otimização COM FORMATO EXIGIDO
+                    # Prompt de otimização COMPLETO
                     prompt = f"""
                     {contexto_agente}
 
                     ## TAREFA: OTIMIZAR CONTEÚDO SEGUINDO TODAS AS ESPECIFICAÇÕES
 
-                    **TEXTO ORIGINAL:**
+                    **TEXTO ORIGINAL PARA OTIMIZAÇÃO:**
                     {texto_para_otimizar}
 
-                    **FONTES DA BUSCA WEB:**
+                    **FONTES TÉCNICAS DA BUSCA WEB:**
                     {fontes_encontradas if fontes_encontradas else "Nenhuma fonte adicional encontrada na busca web."}
 
                     **INSTRUÇÕES DO BRIEFING:**
@@ -2968,8 +2943,9 @@ with tab_otimizacao:
                     - Tom de voz: {tom_voz}
                     - Nível de heading solicitado: {nivel_heading}
                     - Incluir links internos: {"Sim" if incluir_links_internos else "Não"}
+                    - Busca web utilizada: {"Sim" if usar_busca_web else "Não"}
 
-                    ## REGRAS ESTRITAS:
+                    ## ESPECIFICAÇÕES OBRIGATÓRIAS:
 
                     1. **SUGESTÕES DE TITLES E DESCRIPTIONS (OBRIGATÓRIO):**
                        - Gere 3 opções de meta title (máx 60 caracteres cada)
@@ -2986,7 +2962,7 @@ with tab_otimizacao:
                        - Limite de 3-5 itens por lista
                        - Cada bullet: máximo 1 linha
 
-                    3. **NÍVEL DE HEADING DA TAG:**
+                    3. **NÍVEL DE HEADING DA TAG (CORREÇÃO OBRIGATÓRIA):**
                        - Verifique níveis de heading no conteúdo original
                        - Corrija se usar H4 quando foi solicitado {nivel_heading}
                        - Todos os headings principais devem ser {nivel_heading}
@@ -3000,6 +2976,7 @@ with tab_otimizacao:
                        - Melhore escaneabilidade
                        - Divida frases muito longas
                        - Reforce público-alvo
+                       - Use dados da busca web quando disponíveis
 
                     5. **LINKS INTERNOS (se solicitado):**
                        - Sugira 3-5 links internos relevantes
@@ -3007,9 +2984,9 @@ with tab_otimizacao:
 
                     ## FORMATO DE SAÍDA OBRIGATÓRIO:
 
-                    ### 📊 SUGESTÕES DE TITLES E DESCRIPTIONS (OBRIGATÓRIO)
+                    ### 📊 SUGESTÕES DE TITLES E DESCRIPTIONS
 
-                    **Opção 1:**
+                    **Opção 1 (Recomendada):**
                     Title: [title com até 60 caracteres]
                     Description: [description com até 155 caracteres]
 
@@ -3022,18 +2999,18 @@ with tab_otimizacao:
                     Description: [description com até 155 caracteres]
 
                     ### ✅ CORREÇÕES APLICADAS
-                    [Liste cada correção aplicada]
+                    [Liste cada correção aplicada com detalhes]
 
                     ### 🔗 LINKS INTERNOS SUGERIDOS (se aplicável)
                     [Liste 3-5 links internos com contexto]
 
-                    ### 📝 CONTEÚDO OTIMIZADO
+                    ### 📝 CONTEÚDO OTIMIZADO (COM TODAS AS CORREÇÕES)
                     [AQUI O CONTEÚDO COMPLETO OTIMIZADO com:
-                    - Meta title e description selecionadas (colocar no início)
-                    - Bullet points onde aplicável
+                    - Meta title e description selecionadas (usar a Opção 1 no início)
+                    - Bullet points onde aplicável em SEO
                     - Headings corrigidos para {nivel_heading}
                     - Todas as correções aplicadas
-                    - Fontes ancoradas (se houver)
+                    - Fontes ancoradas quando usar dados da busca web
                     - Links internos inseridos (se solicitado)]
 
                     Aplique TODAS as especificações acima automaticamente.
@@ -3071,6 +3048,10 @@ with tab_otimizacao:
                                         content_part = links_part.split("### 📝 CONTEÚDO OTIMIZADO")[1]
                                         partes_do_resultado["📝 CONTEÚDO OTIMIZADO"] = content_part.strip()
                     
+                    # Se não extraiu corretamente, usar resultado completo
+                    if not partes_do_resultado:
+                        partes_do_resultado["📝 CONTEÚDO OTIMIZADO"] = resultado
+                    
                     # Salvar no session state
                     st.session_state.conteudo_otimizado = partes_do_resultado.get("📝 CONTEÚDO OTIMIZADO", resultado)
                     st.session_state.ultima_otimizacao = resultado
@@ -3085,15 +3066,29 @@ with tab_otimizacao:
                     st.subheader("📊 Sugestões de Titles e Descriptions (Obrigatório)")
                     if "📊 SUGESTÕES DE TITLES E DESCRIPTIONS" in partes_do_resultado:
                         st.markdown(partes_do_resultado["📊 SUGESTÕES DE TITLES E DESCRIPTIONS"])
+                        
+                        # Extrair a primeira opção para usar no conteúdo
+                        meta_content = partes_do_resultado["📊 SUGESTÕES DE TITLES E DESCRIPTIONS"]
+                        if "**Opção 1 (Recomendada):**" in meta_content:
+                            # Tentar extrair title e description da opção 1
+                            lines = meta_content.split('\n')
+                            for i, line in enumerate(lines):
+                                if "Title:" in line:
+                                    meta_title = line.replace("Title:", "").strip()
+                                if "Description:" in line:
+                                    meta_description = line.replace("Description:", "").strip()
+                                    break
                     else:
-                        # Tentar extrair meta tags do resultado
                         st.warning("Meta tags não foram geradas no formato esperado")
-                        # Mostrar primeiras linhas que parecem meta tags
+                        # Tentar encontrar meta tags no resultado completo
                         lines = resultado.split('\n')
-                        meta_lines = [line for line in lines if 'title' in line.lower() or 'description' in line.lower() or 'meta' in line.lower()]
-                        if meta_lines:
+                        meta_found = []
+                        for line in lines:
+                            if 'title' in line.lower() or 'description' in line.lower() or 'meta' in line.lower():
+                                meta_found.append(line)
+                        if meta_found:
                             st.info("Possíveis meta tags encontradas:")
-                            for line in meta_lines[:6]:
+                            for line in meta_found[:6]:
                                 st.write(line)
                     
                     # 2. Mostrar Correções Aplicadas
@@ -3102,7 +3097,7 @@ with tab_otimizacao:
                             st.markdown(partes_do_resultado["✅ CORREÇÕES APLICADAS"])
                     
                     # 3. Mostrar Busca Web (se aplicável)
-                    if fontes_encontradas:
+                    if fontes_encontradas and usar_busca_web:
                         with st.expander("🔍 Fontes Encontradas na Busca Web"):
                             st.markdown(fontes_encontradas)
                     
@@ -3123,9 +3118,8 @@ with tab_otimizacao:
                     
                     with col_check1:
                         # Verificar meta tags
-                        meta_lines_count = len([l for l in conteudo_final.lower().split('\n') 
-                                              if 'title' in l or 'description' in l or 'meta' in l])
-                        st.metric("Meta Tags", f"{meta_lines_count} encontradas")
+                        meta_found = 'title' in conteudo_final.lower() or 'description' in conteudo_final.lower()
+                        st.metric("Meta Tags", "✅ Geradas" if meta_found else "⚠️ Verificar")
                     
                     with col_check2:
                         # Verificar bullets (contar no conteúdo)
@@ -3134,11 +3128,9 @@ with tab_otimizacao:
                     
                     with col_check3:
                         # Verificar heading level
-                        heading_tags = [f"<h{i}>" for i in range(1, 5)]
-                        heading_count = sum(conteudo_final.lower().count(tag) for tag in heading_tags)
                         heading_correct = nivel_heading.lower() in conteudo_final.lower()
                         st.metric(f"Heading {nivel_heading}", 
-                                "✅ Presente" if heading_correct else f"⚠️ {heading_count} headings")
+                                "✅ Presente" if heading_correct else "⚠️ Verificar")
                     
                     # Botão de download
                     st.download_button(
@@ -3147,6 +3139,15 @@ with tab_otimizacao:
                         file_name=f"conteudo_otimizado_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
                         mime="text/plain"
                     )
+                    
+                    # Botão para download das meta tags separadas
+                    if "📊 SUGESTÕES DE TITLES E DESCRIPTIONS" in partes_do_resultado:
+                        st.download_button(
+                            "📋 Baixar Apenas Meta Tags",
+                            data=partes_do_resultado["📊 SUGESTÕES DE TITLES E DESCRIPTIONS"],
+                            file_name=f"meta_tags_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                            mime="text/plain"
+                        )
                 
                 except Exception as e:
                     st.error(f"Erro na otimização: {str(e)}")
@@ -3164,7 +3165,7 @@ with tab_otimizacao:
             placeholder="""Exemplos:
 - Adicione mais bullet points para benefícios
 - Corrija todos os headings para H3
-- Melhore as meta tags (especifique o que quer)
+- Melhore as meta tags
 - Adicione mais dados técnicos
 - Simplifique a linguagem"""
         )
@@ -3180,36 +3181,55 @@ with tab_otimizacao:
                                 historico += f"{i}. {a}\n"
                         
                         prompt_ajuste = f"""
-                        ## AJUSTE INCREMENTAL
+                        ## AJUSTE INCREMENTAL COM ESPECIFICAÇÕES
 
                         **CONTEÚDO ATUAL (JÁ OTIMIZADO):**
                         {st.session_state.conteudo_otimizado}
 
-                        **ESPECIFICAÇÕES ORIGINAIS:**
+                        **CONFIGURAÇÕES ORIGINAIS:**
                         - Tipo: {tipo_otimizacao}
                         - Tom: {tom_voz}
                         - Heading solicitado: {nivel_heading}
                         - Meta tags obrigatórias: SIM
                         - Bullets quando aplicável: SIM
 
-                        **HISTÓRICO DE AJUSTES:**
                         {historico}
 
                         **NOVOS AJUSTES SOLICITADOS:**
                         {comando_ajuste}
 
-                        **REGRAS PARA AJUSTES:**
-                        1. Mantenha meta title e description
-                        2. Use bullet points quando aplicável
-                        3. Mantenha heading level {nivel_heading}
+                        **REGRAS DE AJUSTE (MANTENHA):**
+                        1. Meta tags devem ser mantidas ou melhoradas
+                        2. Bullet points devem ser usados quando aplicável
+                        3. Heading level {nivel_heading} deve ser mantido
                         4. Parágrafos curtos (3-4 frases máx)
                         5. Escaneabilidade preservada
 
-                        **RETORNE APENAS O CONTEÚDO ATUALIZADO, mantendo a mesma estrutura.**
+                        **FORMATO DE RESPOSTA:**
+                        ### ✅ AJUSTES APLICADOS:
+                        [Liste ajustes aplicados]
+
+                        ### 📊 META TAGS ATUALIZADAS (se necessário):
+                        [Meta title e description atualizadas]
+
+                        ### 📝 CONTEÚDO ATUALIZADO:
+                        [Conteúdo completo com ajustes aplicados]
+
+                        Aplique os ajustes mantendo TODAS as especificações anteriores.
                         """
 
                         resposta_ajuste = modelo_texto.generate_content(prompt_ajuste)
-                        conteudo_atualizado = resposta_ajuste.text
+                        resultado_ajuste = resposta_ajuste.text
+                        
+                        # Extrair conteúdo atualizado
+                        if "### 📝 CONTEÚDO ATUALIZADO:" in resultado_ajuste:
+                            partes = resultado_ajuste.split("### 📝 CONTEÚDO ATUALIZADO:")
+                            if len(partes) > 1:
+                                conteudo_atualizado = partes[1].strip()
+                            else:
+                                conteudo_atualizado = resultado_ajuste.strip()
+                        else:
+                            conteudo_atualizado = resultado_ajuste.strip()
                         
                         # Atualizar session state
                         st.session_state.conteudo_otimizado = conteudo_atualizado
@@ -3234,7 +3254,6 @@ with tab_otimizacao:
         if st.button("🗑️ Limpar Histórico de Ajustes"):
             st.session_state.ajustes_realizados = []
             st.success("Histórico limpo")
-
 # ========== ABA: CRIADORA DE CALENDÁRIO ==========
 with tab_calendario:
     st.header("📅 Criadora de Calendário de Conteúdo")
