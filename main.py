@@ -2776,7 +2776,7 @@ def buscar_perplexity(pergunta: str, contexto_agente: str = None) -> str:
         if contexto_agente:
             messages.append({
                 "role": "system", 
-                "content": f"Você é um assistente especializado em agronomia. Contexto: {contexto_agente}"
+                "content": f"Você é um assistente especializado. Contexto: {contexto_agente}"
             })
         
         messages.append({
@@ -2785,10 +2785,10 @@ def buscar_perplexity(pergunta: str, contexto_agente: str = None) -> str:
         })
         
         data = {
-            "model": "sonar-medium-online",
+            "model": "sonar",
             "messages": messages,
             "max_tokens": 2000,
-            "temperature": 0.1
+            "temperature": 0.0
         }
         
         response = requests.post(
