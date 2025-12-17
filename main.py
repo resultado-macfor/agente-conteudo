@@ -330,8 +330,8 @@ if not gemini_api_key:
     st.stop()
 
 genai.configure(api_key=gemini_api_key)
-modelo_vision = genai.GenerativeModel("gemini-2.0-flash", generation_config={"temperature": 0.1})
-modelo_texto = genai.GenerativeModel("gemini-2.0-flash")
+modelo_vision = genai.GenerativeModel("gemini-2.5-flash", generation_config={"temperature": 0.0})
+modelo_texto = genai.GenerativeModel("gemini-2.5-flash")
 modelo_texto2 = genai.GenerativeModel("gemini-2.5-pro")
 
 # --- Funções CRUD para Agentes ---
@@ -2867,224 +2867,226 @@ Forneça uma análise técnica detalhada baseada no conteúdo dessas URLs."""
 
 # ========== ABA: OTIMIZAÇÃO DE CONTEÚDO ==========
 with tab_otimizacao:
-    st.header("🚀 Otimização de Conteúdo com Busca Web")
+    st.header("🚀 Otimização de Conteúdo")
     
+    # Inicializar session state
+    if 'conteudo_otimizado' not in st.session_state:
+        st.session_state.conteudo_otimizado = None
+    if 'ultima_otimizacao' not in st.session_state:
+        st.session_state.ultima_otimizacao = None
+    if 'ajustes_realizados' not in st.session_state:
+        st.session_state.ajustes_realizados = []
+    
+    # Área para entrada do conteúdo
     texto_para_otimizar = st.text_area("Cole o conteúdo para otimização:", height=300)
     
-
-    tipo_otimizacao = st.selectbox("Tipo de Otimização:", 
+    # Configurações
+    col_config1, col_config2 = st.columns([2, 1])
+    
+    with col_config1:
+        tipo_otimizacao = st.selectbox("Tipo de Otimização:", 
                                       ["SEO", "Engajamento", "Conversão", "Clareza"])
         
-    
-
-    # CONFIGURAÇÕES DE BUSCA WEB
-    st.subheader("🔍 Busca Web para Fontes")
-    
-    usar_busca_web = st.checkbox("Usar busca web para encontrar fontes relevantes", 
-                               value=True,
-                               help="Ativa a busca no Perplexity para encontrar informações atualizadas")
-    
-    if usar_busca_web:
-        # Configuração de URLs específicas
-        urls_dominios = st.text_area(
-            "Domínios específicos para busca (um por linha, opcional):",
-            placeholder="""embrapa.br
-esalq.usp.br
-agricultura.gov.br""",
-            help="Restrinja a busca a estes domínios específicos. Deixe vazio para busca geral.",
-            height=100
-        )
+    with col_config2:
+        tom_voz = st.selectbox("Tom de Voz:", 
+                              ["Formal", "Informal", "Persuasivo", "Educativo", 
+                               "Inspirador", "Técnico", "Jornalístico"])
         
-        # Processar URLs
-        dominios_especificos = []
-        if urls_dominios:
-            dominios_especificos = [url.strip() for url in urls_dominios.split('\n') if url.strip()]
-            if dominios_especificos:
-                st.info(f"✅ Busca restrita a {len(dominios_especificos)} domínio(s)")
+        nivel_heading = st.selectbox("Nível de Heading:", 
+                                   ["H1", "H2", "H3", "H4"],
+                                   help="Define o nível dos títulos")
+
+    # Área para briefing
+    instrucoes_briefing = st.text_area(
+        "Instruções do briefing (opcional):",
+        height=80
+    )
 
     # Botão de otimização
-    if st.button("🚀 Otimizar Conteúdo com Busca Web", type="primary"):
+    if st.button("🚀 Otimizar Conteúdo", type="primary", use_container_width=True):
         if texto_para_otimizar:
-            with st.spinner("Otimizando conteúdo com busca web..."):
+            with st.spinner("Otimizando conteúdo..."):
                 try:
-                    # FASE 1: BUSCA WEB (se ativada)
-                    fontes_encontradas = ""
+                    # Contexto do agente
+                    contexto_agente = ""
+                    if st.session_state.agente_selecionado:
+                        agente = st.session_state.agente_selecionado
+                        contexto_agente = construir_contexto(agente, st.session_state.segmentos_selecionados)
                     
-                    if usar_busca_web:
-                        st.info("🔍 Buscando fontes relevantes na web...")
-                        
-                        # Construir contexto do agente para a busca
-                        contexto_busca = ""
-                        if st.session_state.agente_selecionado:
-                            agente = st.session_state.agente_selecionado
-                            contexto_busca = construir_contexto(agente, st.session_state.segmentos_selecionados)
-                        
-                        # Construir query de busca baseada no conteúdo
-                        query_base = f"""
-                        Forneça informações técnicas atualizadas e fontes confiáveis sobre: 
-                        {texto_para_otimizar[:800]}
-                        
-                        Foco em: {tipo_otimizacao}
-                        """
-                        
-                        # Adicionar restrição de domínios se especificados
-                        if dominios_especificos:
-                            dominios_str = " OR ".join([f"site:{dominio}" for dominio in dominios_especificos])
-                            query_base += f"\n\nPriorizar fontes de: {', '.join(dominios_especificos)}"
-                        
-                        # Buscar fontes relevantes
-                        resultado_busca = buscar_perplexity(query_base, contexto_busca)
-                        
-                        if resultado_busca and not resultado_busca.startswith("❌"):
-                            fontes_encontradas = resultado_busca
-                            st.success("✅ Fontes relevantes encontradas")
-                            
-                            with st.expander("📚 Visualizar Fontes Encontradas", expanded=False):
-                                st.markdown(fontes_encontradas)
-                        else:
-                            st.warning("⚠️ Busca web não retornou resultados. Continuando com otimização baseada no conteúdo original.")
-
-                    # FASE 2: OTIMIZAÇÃO
-                    st.info("✍️ Otimizando conteúdo...")
-                    
-                    # PROMPT DE OTIMIZAÇÃO COMPLETO
+                    # Prompt de otimização
                     prompt = f"""
-                    SUA PERSONALIDADE: Você é um profissional com experiência em agronomia e SEO para o setor agrícola brasileiro. Conhece profundamente cultivos, manejo, sustentabilidade e produtividade.
+                    {contexto_agente}
 
-                    Objetivo: Otimizar o conteúdo seguindo rigorosamente as instruções fornecidas, garantindo qualidade técnica e aplicação das boas práticas de conteúdo.
+                    ## TAREFA: OTIMIZAR CONTEÚDO CORRIGINDO TODOS OS PROBLEMAS
 
-                    INSTRUÇÕES OBRIGATÓRIAS:
+                    **PROBLEMAS A CORRIGIR AUTOMATICAMENTE:**
+                    1. Introduções genéricas/repetitivas
+                    2. Parágrafos muito longos
+                    3. Falta de bullet points/listas
+                    4. Repetição de informações
+                    5. Títulos em nível incorreto
+                    6. Tópicos fora do briefing
+                    7. Falta de meta title/description
+                    8. Escaneabilidade deficiente
+                    9. Frases muito longas
+                    10. Público-alvo não reforçado
 
-                    1. SEGUIR BRIEFING EXATAMENTE
-                    - Não adicionar tópicos extras não solicitados
-                    - Não alterar a ordem do outline original
-                    - Não criar seções novas
-                    - Se houver necessidade de ajustes, sugerir antes da entrega
-                    - Ancorar referências na parte do texto em que a referência se mostrou relevante
+                    **CONFIGURAÇÕES:**
+                    - Tipo: {tipo_otimizacao}
+                    - Tom: {tom_voz}
+                    - Heading: {nivel_heading}
 
-                    2. COMPLETAR TODAS AS SEÇÕES
-                    - Garantir que todos os tópicos tenham respostas completas
-                    - Nenhuma seção deve vir vazia ou incompleta
-                    - Não usar frases genéricas do tipo "explique aqui..."
+                    **BRIEFING:**
+                    {instrucoes_briefing if instrucoes_briefing else 'Sem briefing específico'}
 
-                    3. FONTES CONFIÁVEIS E REFERENCIADAS
-                    - Trazer dados sempre com fonte específica
-                    - Não citar fontes generalistas (ex: "Embrapa" sem referência)
-                    - Usar fontes verificáveis e contextualizadas
-                    - Inserir lista de referências com URL específica ao final
-
-                    4. META TITLE E DESCRIPTION
-                    - Incluir sempre sugestões de meta title e meta description
-                    - Title tag (≤60 caracteres) com palavra-chave no início
-                    - Meta description (≤155 caracteres) com benefício + CTA
-
-                    5. INTRODUÇÕES E CONCLUSÕES ÚNICAS
-                    - Remover frases padrão repetitivas
-                    - Criar introduções únicas e contextualizadas
-                    - Criar conclusões originais que amarrrem as ideias
-
-                    6. LEGIBILIDADE E ESCANEABILIDADE
-                    - Parágrafos curtos (máximo 3-4 linhas)
-                    - Usar listas quando apropriado
-                    - Aplicar destaques em negrito quando útil
-                    - Evitar grandes blocos de texto
-
-                    7. ELIMINAR REDUNDÂNCIAS
-                    - Evitar repetição de conceitos ao longo do texto
-                    - Não repetir palavras ou frases consecutivamente
-                    - Remover informações redundantes
-
-                    8. FORMATAÇÃO CIENTÍFICA
-                    - Escrever nomes científicos em itálico sempre
-
-                    9. TABELAS LIMPAS
-                    - Evitar fundos pretos nas tabelas
-                    - Usar tabelas simples (markdown ou texto)
-                    - Garantir legibilidade em modo escuro
-
-                    10. ESCRITA NEUTRA E OBJETIVA
-                    - Não assumir papel de "guia técnico", "consultor" ou "especialista"
-                    - Usar escrita neutra, objetiva e informativa
-                    - Evitar frases institucionais ou autoconscientes
-
-                    11. VARIEDADE NA ESTRUTURA
-                    - Evitar "modelo único" de explicação
-                    - Variar estrutura frasal e construção dos parágrafos
-                    - Alterar ritmo, exemplos e narrativa entre textos
-
-                    DIRETRIZES TÉCNICAS ADICIONAIS:
-                    - Português brasileiro, tecnicamente embasado e acessível
-                    - Subtítulo a cada ~200 palavras
-                    - Negrito apenas em conceitos-chave
-                    - Itálico para nomes científicos e termos estrangeiros
-                    - Incluir exemplos práticos com fontes específicas
-                    - Considerar sazonalidade e regionalização brasileira
-                    - Manter originalidade sem conteúdo genérico
-
-                    CONFIGURAÇÕES ATUAIS:
-                    - Foco da otimização: {tipo_otimizacao}
-                    - Busca web utilizada: {"Sim" if fontes_encontradas else "Não"}
-
-                    FONTES ENCONTRADAS NA BUSCA WEB:
-                    {fontes_encontradas if fontes_encontradas else "Nenhuma fonte adicional encontrada na busca web."}
-
-                    ###BEGIN CONTEÚDO A SER OTIMIZADO###
+                    **CONTEÚDO ORIGINAL:**
                     {texto_para_otimizar}
-                    ###END CONTEÚDO A SER OTIMIZADO###
 
-                    ESTRUTURA DE RESPOSTA OBRIGATÓRIA:
+                    ## REGRAS DE CORREÇÃO AUTOMÁTICA:
 
-                    1. META TAGS (sempre incluir)
-                    - Title tag: [até 60 caracteres]
-                    - Meta description: [até 155 caracteres]
+                    1. **INTRODUÇÃO**: Reescreva se genérica. Não use "No dinâmico cenário do agro brasileiro"
+                    2. **PARÁGRAFOS**: Máximo 3-4 frases. Quebre blocos grandes
+                    3. **LISTAS**: Use bullet points para benefícios/características
+                    4. **REPETIÇÃO**: Remova informações duplicadas
+                    5. **TÍTULOS**: Use {nivel_heading} corretamente
+                    6. **FOCO**: Mantenha apenas tópicos do briefing
+                    7. **META TAGS**: Gere title (≤60) e description (≤155)
+                    8. **ESCANEABILIDADE**: Subheaders a cada 200-300 palavras
+                    9. **FRASES**: Máximo 25 palavras por frase
+                    10. **PÚBLICO**: Reforce público-alvo organicamente
 
-                    2. CONTEÚDO OTIMIZADO
-                    [aplicar todas as melhorias listadas acima + incorporar insights das fontes encontradas quando relevantes]
+                    ## FORMATO DE SAÍDA:
 
-                    3. REFERÊNCIAS E FONTES
-                    [lista com fontes específicas e URLs - incluir tanto as fontes da busca web quanto referências gerais]
+                    ### ✅ CORREÇÕES APLICADAS
+                    [Liste correções aplicadas]
 
-                    4. RESUMO DAS MELHORIAS APLICADAS
-                    [listar as principais otimizações realizadas]
+                    ### 📝 CONTEÚDO OTIMIZADO
+                    [Conteúdo corrigido e pronto]
 
-                    IMPORTANTE: 
-                    - Não reduzir o tamanho do texto original. 
-                    - Alterar a estrutura apenas para otimização.
-                    - Incorporar insights das fontes encontradas quando relevantes
-                    - Manter a essência e informações principais do conteúdo original
+                    ### 🔍 META TAGS
+                    [Meta title e description]
+
+                    Aplique TODAS as correções automaticamente.
                     """
 
                     resposta = modelo_texto.generate_content(prompt)
-                    conteudo_otimizado = resposta.text
+                    resultado = resposta.text
                     
-                    # Exibir resultados
-                    st.subheader("📊 Conteúdo Otimizado")
+                    # Separar resultados
+                    if "### 📝 CONTEÚDO OTIMIZADO" in resultado:
+                        partes = resultado.split("### 📝 CONTEÚDO OTIMIZADO")
+                        resumo_correcoes = partes[0]
+                        restante = partes[1] if len(partes) > 1 else ""
+                        
+                        if "### 🔍 META TAGS" in restante:
+                            partes2 = restante.split("### 🔍 META TAGS")
+                            conteudo_otimizado = partes2[0].strip()
+                            meta_tags = "### 🔍 META TAGS" + partes2[1] if len(partes2) > 1 else ""
+                        else:
+                            conteudo_otimizado = restante.strip()
+                            meta_tags = ""
+                    else:
+                        resumo_correcoes = "Correções aplicadas"
+                        conteudo_otimizado = resultado.strip()
+                        meta_tags = ""
+                    
+                    # Salvar no session state
+                    st.session_state.conteudo_otimizado = conteudo_otimizado
+                    st.session_state.ultima_otimizacao = resultado
+                    st.session_state.texto_original = texto_para_otimizar
+                    
+                    # Exibir
+                    st.success("✅ Conteúdo otimizado")
+                    
+                    with st.expander("📊 Correções aplicadas"):
+                        st.markdown(resumo_correcoes)
+                    
                     st.markdown(conteudo_otimizado)
                     
-                    # Estatísticas rápidas
-                    st.divider()
-                    col_stat1, col_stat2, col_stat3 = st.columns(3)
-                    with col_stat1:
-                        st.metric("Busca Web", "✓ Sim" if fontes_encontradas else "✗ Não")
-                    with col_stat2:
-                        st.metric("Domínios", len(dominios_especificos) if dominios_especificos else "Todos")
-                    with col_stat3:
-                        palavras_orig = len(texto_para_otimizar.split())
-                        palavras_opt = len(conteudo_otimizado.split())
-                        st.metric("Palavras", palavras_opt)
+                    if meta_tags:
+                        with st.expander("🔍 Meta Tags"):
+                            st.markdown(meta_tags)
                     
-                    # Botão de download
                     st.download_button(
-                        "💾 Baixar Conteúdo Otimizado",
+                        "💾 Baixar",
                         data=conteudo_otimizado,
                         file_name=f"conteudo_otimizado_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
                         mime="text/plain"
                     )
-                    
+                
                 except Exception as e:
-                    st.error(f"Erro na otimização: {str(e)}")
+                    st.error(f"Erro: {str(e)}")
         else:
-            st.warning("Por favor, cole um conteúdo para otimização.")
+            st.warning("Cole um conteúdo")
+
+    # Ajustes incrementais
+    if st.session_state.conteudo_otimizado:
+        st.divider()
+        st.subheader("🔄 Ajustes Incrementais")
+        
+        comando_ajuste = st.text_area(
+            "Ajustes desejados:",
+            height=80
+        )
+        
+        if st.button("🔄 Aplicar Ajustes"):
+            if comando_ajuste:
+                with st.spinner("Aplicando ajustes..."):
+                    try:
+                        # Histórico de ajustes
+                        historico = ""
+                        if st.session_state.ajustes_realizados:
+                            historico = "Histórico de ajustes:\n"
+                            for i, a in enumerate(st.session_state.ajustes_realizados, 1):
+                                historico += f"{i}. {a}\n"
+                        
+                        prompt_ajuste = f"""
+                        ## AJUSTE INCREMENTAL
+
+                        **CONTEÚDO ATUAL:**
+                        {st.session_state.conteudo_otimizado}
+
+                        {historico}
+
+                        **NOVOS AJUSTES:**
+                        {comando_ajuste}
+
+                        **INSTRUÇÕES:**
+                        1. Mantenha estrutura atual
+                        2. Aplique ajustes solicitados
+                        3. Preserve correções anteriores
+                        4. Retorne conteúdo atualizado
+
+                        **FORMATO:**
+                        [Conteúdo com ajustes aplicados]
+                        """
+
+                        resposta_ajuste = modelo_texto.generate_content(prompt_ajuste)
+                        conteudo_atualizado = resposta_ajuste.text.strip()
+                        
+                        # Atualizar
+                        st.session_state.conteudo_otimizado = conteudo_atualizado
+                        st.session_state.ajustes_realizados.append(comando_ajuste)
+                        
+                        st.success("✅ Ajustes aplicados")
+                        st.markdown(conteudo_atualizado)
+                        
+                        st.download_button(
+                            "💾 Baixar Versão Atualizada",
+                            data=conteudo_atualizado,
+                            file_name=f"conteudo_ajustado_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                            mime="text/plain"
+                        )
+                        
+                    except Exception as e:
+                        st.error(f"Erro: {str(e)}")
+            else:
+                st.warning("Digite ajustes")
+        
+        # Limpar histórico
+        if st.button("🗑️ Limpar Histórico"):
+            st.session_state.ajustes_realizados = []
+            st.success("Histórico limpo")
 
 # ========== ABA: CRIADORA DE CALENDÁRIO ==========
 with tab_calendario:
