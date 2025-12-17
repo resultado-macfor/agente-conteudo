@@ -2796,28 +2796,12 @@ def buscar_fontes_para_otimizacao(conteudo: str, tipo: str, tom: str) -> str:
         return "Busca web desativada"
     
     prompt = f"""
-    Para otimização de conteúdo forneça:
     
-    1. DADOS TÉCNICOS ATUALIZADOS para este conteúdo:
+   
+    DADOS TÉCNICOS ATUALIZADOS para este conteúdo:
     {conteudo[:800]}
     
-    2. INFORMAÇÕES RELEVANTES para otimização tipo: {tipo}
     
-    3. FONTES CONFIÁVEIS (cite especificamente):
-    - Embrapa (quais unidades/centros de pesquisa)
-    - Universidades (quais faculdades de agronomia)
-    - Institutos de pesquisa agrícola
-    - Dados oficiais (CONAB, IBGE, etc.)
-    
-    4. ESTATÍSTICAS RECENTES relacionadas ao tema
-    
-    5. BOAS PRÁTICAS comprovadas cientificamente
-    
-    Formato:
-    - Lista de tópicos claros
-    - Cada ponto com fonte específica
-    - Dados concretos e verificáveis
-    - Foco em informações úteis para enriquecer o conteúdo
     """
     
     return buscar_perplexity(prompt)
