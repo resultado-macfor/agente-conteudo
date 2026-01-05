@@ -3082,6 +3082,8 @@ with tab_otimizacao:
                     
                     [CTA FINAL OBRIGATÓRIO com link]
 
+                    [Links que foram ancorados por extenso]
+
 
 
                     **TEXTO ORIGINAL:**
@@ -3120,19 +3122,16 @@ with tab_otimizacao:
                        - Manter hierarquia consistente
 
                     4. **CORREÇÕES AUTOMÁTICAS:**
-                       - Remova introduções genéricas
+                       - Remova introduções genéricas - Você é um profissional experiente
                        - Quebre parágrafos longos (3-4 frases máx)
                        - Remova repetições
                        - Melhore escaneabilidade
                        - Divida frases complexas
                        - Incorpore dados das fontes quando relevante
 
-                    5. **LINKS INTERNOS (se solicitado):**
+                    5. **LINKS INTERNOS:**
                        Sugira 3-5 links relevantes no formato: [texto âncora](url)
-
-                    
-
-                    IMPORTANTE: Aplique TODAS as correções automaticamente.
+                       Escreva os links que foram ancorados por extenso ao final
                     """
 
                     # Gerar otimização
