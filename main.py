@@ -2877,14 +2877,14 @@ with tab_otimizacao:
             Analise este conteúdo agrícola e forneça informações técnicas atualizadas para enriquecê-lo:
 
             **TEXTO BASE:**
-            {texto[:800]}
+            {texto}
 
             **CONTEXTO DA OTIMIZAÇÃO:**
             - Tipo: {tipo_otimizacao}
             - Tom: {tom_voz}
 
             **FORNECER:**
-            1. DADOS TÉCNICOS ATUALIZADOS (últimos 3 anos)
+            1. DADOS TÉCNICOS ATUALIZADOS
             2. ESTATÍSTICAS RELEVANTES do setor agrícola
             3. FONTES CONFIÁVEIS (Embrapa, universidades, pesquisas)
             4. INFORMAÇÕES PARA MELHORAR {tipo_otimizacao}
@@ -2965,127 +2965,129 @@ with tab_otimizacao:
                     
                     # Prompt de otimização
                     prompt = f"""
+                    ###BEGIN contexto agente###
                     {contexto_agente}
+                    ###END contexto agente###
 
                     Instruções: Você é um especialista em agronomia e redator técnico. Com base nas informações fornecidas no formato abaixo, gere um artigo completo e bem estruturado sobre o ciclo de desenvolvimento de uma cultura agrícola, seguindo rigorosamente a estrutura, diretrizes e marcação solicitadas.
 
-Formato de Entrada (exemplo):
-text
+                    ############BEGIN Formato de Entrada################
+                    TÍTULO/H1 desejado: [Título do artigo]
+                    Objetivo do conteúdo: [Objetivo descritivo do conteúdo]
+                    Público-alvo (persona, nível técnico): [Descrição do público]
+                    Palavra-chave principal (KW1): [Palavra-chave primária]
+                    Palavras-chave secundárias: [Lista de palavras-chave secundárias, uma por linha]
+                    Estrutura (H2/H3 em ordem):
+                    [Estrutura completa do artigo com títulos H2 e H3]
+                    Região/bioma/safra alvo: [Cultura e contexto]
+                    CTA FINAL OBRIGATÓRIA:
+                    [Texto do call-to-action]
+                    link da CTA: [URL]
+                    Interlinks prioritários (URLs internas existentes): [Lista ou "não aplicável"]
+                    Links externos obrigatórios (se houver): [Lista ou "não aplicável"]
+                    Diretrizes de tom/estilo (brand voice): [Ex.: técnico e leve]
+                    Observações/restrições: [Informações adicionais]
+                    ############END Formato de Entrada################
 
-TÍTULO/H1 desejado: [Título do artigo]
-Objetivo do conteúdo: [Objetivo descritivo do conteúdo]
-Público-alvo (persona, nível técnico): [Descrição do público]
-Palavra-chave principal (KW1): [Palavra-chave primária]
-Palavras-chave secundárias: [Lista de palavras-chave secundárias, uma por linha]
-Estrutura (H2/H3 em ordem):
-[Estrutura completa do artigo com títulos H2 e H3]
-Região/bioma/safra alvo: [Cultura e contexto]
-CTA FINAL OBRIGATÓRIA:
-[Texto do call-to-action]
-link da CTA: [URL]
-Interlinks prioritários (URLs internas existentes): [Lista ou "não aplicável"]
-Links externos obrigatórios (se houver): [Lista ou "não aplicável"]
-Diretrizes de tom/estilo (brand voice): [Ex.: técnico e leve]
-Observações/restrições: [Informações adicionais]
-
-Sua tarefa: Ao receber uma entrada no formato acima, você deve gerar um documento de artigo completo que inclua:
-
-    Metadados SEO:
-
-        Meta title: Crie um com até 60 caracteres, incluindo a KW1.
-
-        Meta description: Crie uma descrição persuasiva com até 160 caracteres, incluindo a KW1 e uma chamada para ação.
-
-        URL: Sugira uma URL amigável para SEO baseada no título.
-
-        Categoria: Sugira uma categoria temática.
-
-        Imagem de capa: Sugira um tema genérico para imagem (ex.: "Lavouras de [cultura] em campo aberto") e um Alt text descritivo.
-
-    Corpo do Artigo:
-
-        Inicie com o TÍTULO/H1 fornecido.
-
-        Escreva uma introdução envolvente que contextualize a importância da cultura e do manejo correto do seu ciclo.
-
-        Desenvolva o conteúdo seguindo exatamente a ordem e a hierarquia (H2, H3) fornecidas na "Estrutura".
-
-        Para cada H3 (que representa um estágio fenológico), estruture o texto com os seguintes subtópicos, sem usar marcadores na explicação:
-
-            O que é: Definição clara do estágio.
-
-            Características: Descrições morfológicas e fisiológicas principais.
-
-            Práticas de Manejo: Recomendações técnicas específicas para essa fase (nutrição, irrigação, controle fitossanitário).
-
-            Pontos Críticos e Cuidados: Principais riscos (estresses, pragas, doenças) e como mitigá-los.
-
-        Incorpore naturalmente a KW principal e as palavras-chave secundárias ao longo do texto.
-
-        Use um tom que equilibre precisão técnica e clareza, conforme as diretrizes de "brand voice".
-
-        Onde a estrutura sugerir (ex.: após seções longas), insira uma caixa "Leia mais:" ou "Leia também:" com 2-3 sugestões de artigos relacionados baseadas no tema geral. Invente títulos plausíveis para estes interlinks.
-
-        Finalize com uma conclusão que resuma a importância do manejo faseado.
-
-        Inclua obrigatoriamente o CTA FINAL com o texto e link fornecidos.
-
-    Elementos Adicionais (se aplicável na estrutura):
-
-        Se a estrutura incluir "Tabela", crie uma tabela em markdown resumindo os estágios, características, práticas e pontos críticos.
-
-        Se a estrutura incluir uma seção sobre "Quanto tempo dura o ciclo...", explique a variação de duração com base em cultivares, clima e região.
-
-Regras Gerais:
-
-    Fidelidade: Siga a estrutura fornecida à risca. Não altere a ordem dos H2/H3.
-
-    Objetividade: Forneça informações práticas e acionáveis. Evite linguagem excessivamente promocional no corpo do texto.
-
-    Completude: Certifique-se de que todos os elementos da entrada foram atendidos (KWs, estrutura, CTA).
-
-    Formatação: Use negrito para termos técnicos importantes ou frases de impacto ocasionais. Use marcadores apenas em listas de itens muito concisos (ex.: características de um estágio). Prefira parágrafos fluidos.
-
-Exemplo de Saída (Estrutura Visual):
-text
-
-Meta title: [Texto]
-Meta description: [Texto]
-URL: /url-sugerida
-Categoria: [Categoria Sugerida]
-Imagem de capa: [Tema sugerido]
-Alt text: [Descrição da imagem]
-
-# TÍTULO/H1 FORNECIDO
-
-[Parágrafo de introdução]
-
-## H2 FORNECIDO
-[Texto explicativo da seção]
-
-### H3 FORNECIDO
-**O que é:** [Definição].
-**Características:** [Descrição].
-**Práticas de Manejo:** [Recomendações].
-**Pontos Críticos e Cuidados:** [Riscos e soluções].
-
-[Continue para todos os H3s e H2s...]
-
-**Leia mais:**
-*   Título de artigo relacionado 1
-*   Título de artigo relacionado 2
-
-## H2 FINAL (ex.: Conclusão)
-[Texto de conclusão]
-
-[CTA FINAL OBRIGATÓRIO com link]
+                    
+                    Sua tarefa: Ao receber uma entrada no formato acima, você deve gerar um documento de artigo completo que inclua:
+                    
+                        Metadados SEO:
+                    
+                            Meta title: Crie um com até 60 caracteres, incluindo a KW1.
+                    
+                            Meta description: Crie uma descrição persuasiva com até 160 caracteres, incluindo a KW1 e uma chamada para ação.
+                    
+                            URL: Sugira uma URL amigável para SEO baseada no título.
+                    
+                            Categoria: Sugira uma categoria temática.
+                    
+                            Imagem de capa: Sugira um tema genérico para imagem (ex.: "Lavouras de [cultura] em campo aberto") e um Alt text descritivo.
+                    
+                        Corpo do Artigo:
+                    
+                            Inicie com o TÍTULO/H1 fornecido.
+                    
+                            Escreva uma introdução envolvente que contextualize a importância da cultura e do manejo correto do seu ciclo.
+                    
+                            Desenvolva o conteúdo seguindo exatamente a ordem e a hierarquia (H2, H3) fornecidas na "Estrutura".
+                    
+                            Para cada H3 (que representa um estágio fenológico), estruture o texto com os seguintes subtópicos, sem usar marcadores na explicação:
+                    
+                                O que é: Definição clara do estágio.
+                    
+                                Características: Descrições morfológicas e fisiológicas principais.
+                    
+                                Práticas de Manejo: Recomendações técnicas específicas para essa fase (nutrição, irrigação, controle fitossanitário).
+                    
+                                Pontos Críticos e Cuidados: Principais riscos (estresses, pragas, doenças) e como mitigá-los.
+                    
+                            Incorpore naturalmente a KW principal e as palavras-chave secundárias ao longo do texto.
+                    
+                            Use um tom que equilibre precisão técnica e clareza, conforme as diretrizes de "brand voice".
+                    
+                            Onde a estrutura sugerir (ex.: após seções longas), insira uma caixa "Leia mais:" ou "Leia também:" com 2-3 sugestões de artigos relacionados baseadas no tema geral. Invente títulos plausíveis para estes interlinks.
+                    
+                            Finalize com uma conclusão que resuma a importância do manejo faseado.
+                    
+                            Inclua obrigatoriamente o CTA FINAL com o texto e link fornecidos.
+                    
+                        Elementos Adicionais (se aplicável na estrutura):
+                    
+                            Se a estrutura incluir "Tabela", crie uma tabela em markdown resumindo os estágios, características, práticas e pontos críticos.
+                    
+                            Se a estrutura incluir uma seção sobre "Quanto tempo dura o ciclo...", explique a variação de duração com base em cultivares, clima e região.
+                    
+                    Regras Gerais:
+                    
+                        Fidelidade: Siga a estrutura fornecida à risca. Não altere a ordem dos H2/H3.
+                    
+                        Objetividade: Forneça informações práticas e acionáveis. Evite linguagem excessivamente promocional no corpo do texto.
+                    
+                        Completude: Certifique-se de que todos os elementos da entrada foram atendidos (KWs, estrutura, CTA).
+                    
+                        Formatação: Use negrito para termos técnicos importantes ou frases de impacto ocasionais. Use marcadores apenas em listas de itens muito concisos (ex.: características de um estágio). Prefira parágrafos fluidos.
+                    
+                    Exemplo de Saída (Estrutura Visual):
+                    text
+                    
+                    Meta title: [Texto]
+                    Meta description: [Texto]
+                    URL: /url-sugerida
+                    Categoria: [Categoria Sugerida]
+                    Imagem de capa: [Tema sugerido]
+                    Alt text: [Descrição da imagem]
+                    
+                    # TÍTULO/H1 FORNECIDO
+                    
+                    [Parágrafo de introdução]
+                    
+                    ## H2 FORNECIDO
+                    [Texto explicativo da seção]
+                    
+                    ### H3 FORNECIDO
+                    **O que é:** [Definição].
+                    **Características:** [Descrição].
+                    **Práticas de Manejo:** [Recomendações].
+                    **Pontos Críticos e Cuidados:** [Riscos e soluções].
+                    
+                    [Continue para todos os H3s e H2s...]
+                    
+                    **Leia mais:**
+                    *   Título de artigo relacionado 1
+                    *   Título de artigo relacionado 2
+                    
+                    ## H2 FINAL (ex.: Conclusão)
+                    [Texto de conclusão]
+                    
+                    [CTA FINAL OBRIGATÓRIO com link]
 
 
 
                     **TEXTO ORIGINAL:**
                     {texto_para_otimizar}
 
-                    **FONTES DA BUSCA WEB (se disponíveis):**
+                    **FONTES DA BUSCA WEB (para serem usadas de forma ancorada ao longo do texto quando relevantes)**
                     {fontes_encontradas if fontes_encontradas else "Nenhuma fonte externa disponível."}
 
                     **INSTRUÇÕES DO BRIEFING:**
@@ -3128,30 +3130,7 @@ Alt text: [Descrição da imagem]
                     5. **LINKS INTERNOS (se solicitado):**
                        Sugira 3-5 links relevantes no formato: [texto âncora](url)
 
-                    ## FORMATO DE RESPOSTA:
-
-                    ### 📊 SUGESTÕES DE META TAGS
-
-                    **OPÇÃO 1 (RECOMENDADA):**
-                    Title: [máx 60 caracteres]
-                    Description: [máx 155 caracteres]
-
-                    **OPÇÃO 2:**
-                    Title: [máx 60 caracteres]
-                    Description: [máx 155 caracteres]
-
-                    **OPÇÃO 3:**
-                    Title: [máx 60 caracteres]
-                    Description: [máx 155 caracteres]
-
-                    ### ✅ CORREÇÕES APLICADAS
-                    [Liste todas as correções feitas]
-
-                    ### 🔗 LINKS INTERNOS SUGERIDOS
-                    [Liste links se solicitado]
-
-                    ### 📝 CONTEÚDO OTIMIZADO
-                    [Conteúdo completo otimizado]
+                    
 
                     IMPORTANTE: Aplique TODAS as correções automaticamente.
                     """
