@@ -2874,23 +2874,14 @@ with tab_otimizacao:
             
             # Construir prompt para busca
             prompt = f"""
-            Analise este conteúdo agrícola e forneça informações técnicas atualizadas para enriquecê-lo:
+            Informações técnicas atualizadas para enriquecer esse conteúdo:
 
             **TEXTO BASE:**
             {texto}
 
-            **CONTEXTO DA OTIMIZAÇÃO:**
-            - Tipo: {tipo_otimizacao}
-            - Tom: {tom_voz}
 
-            **FORNECER:**
-            1. DADOS TÉCNICOS ATUALIZADOS
-            2. ESTATÍSTICAS RELEVANTES do setor agrícola
-            3. FONTES CONFIÁVEIS (Embrapa, universidades, pesquisas)
-            4. INFORMAÇÕES PARA MELHORAR {tipo_otimizacao}
-            5. EXEMPLOS PRÁTICOS aplicáveis
-
-            Formato de resposta: Bullet points claros com fontes.
+            ##Diretrizes###
+            - pegue texto e link (url) de cada fonte de info
             """
             
             # Fazer busca
@@ -2899,7 +2890,7 @@ with tab_otimizacao:
                 messages=[
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.1,
+                temperature=0.0,
                 max_tokens=2000
             )
             
