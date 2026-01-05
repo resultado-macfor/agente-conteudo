@@ -2874,14 +2874,25 @@ with tab_otimizacao:
             
             # Construir prompt para busca
             prompt = f"""
-            Informações técnicas atualizadas para enriquecer esse conteúdo:
-
-            **TEXTO BASE:**
-            {texto}
-
-
-            ##Diretrizes###
-            - pegue texto e link (url) de cada fonte de info
+            Você é um assistente especializado em pesquisa agrícola. Busque informações atualizadas e confiáveis sobre:
+            
+            TÓPICO PRINCIPAL: {texto}
+            
+            CRITÉRIOS DE PESQUISA:
+            1. Fontes confiáveis: Embrapa, universidades, órgãos governamentais, institutos de pesquisa
+            2. Informações técnicas atualizadas (últimos 2-3 anos)
+            3. Dados concretos: números, estatísticas, resultados de pesquisa
+            4. Melhores práticas agrícolas
+            5. Soluções tecnológicas inovadoras
+            
+            FORMATO DE RESPOSTA:
+            Para CADA fonte encontrada, forneça:
+            - TÍTULO: Título do artigo/referência
+            - CONTEÚDO: Resumo das informações relevantes (máx 200 palavras)
+            - URL: Link completo para a fonte
+            - RELEVÂNCIA: Por que esta fonte é relevante para o tópico
+            
+            Retorne no máximo 20 fontes mais relevantes.
             """
             
             # Fazer busca
@@ -2891,7 +2902,7 @@ with tab_otimizacao:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.0,
-                max_tokens=2000
+                max_tokens=20000
             )
             
             if response and response.choices:
