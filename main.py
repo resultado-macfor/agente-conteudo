@@ -16,6 +16,9 @@ import openai
 import pandas as pd
 import csv
 from perplexity import Perplexity
+import openpyxl
+from openpyxl.styles import Font, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 
 # Configure a API key do Perplexity
 perp_api_key = os.getenv("PERP_API_KEY")
