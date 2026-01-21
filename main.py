@@ -3283,136 +3283,54 @@ with tab_otimizacao:
             
 # ========== ABA: CRIADORA DE CALENDÁRIO ==========
 with tab_calendario:
-    st.header("📅 Criadora de Calendário de Conteúdo")
-    st.markdown("Gere um calendário de pautas no formato visual para conteúdo agrícola")
+    st.header("📅 Criadora de Calendário")
     
-    # Verificar se há agente selecionado
     if not st.session_state.agente_selecionado:
-        st.warning("⚠️ Selecione um agente na parte superior do app para usar esta funcionalidade.")
-        st.info("O calendário será gerado com base nos produtos e informações do agente selecionado.")
+        st.warning("Nenhum agente selecionado.")
     else:
         agente = st.session_state.agente_selecionado
-        st.success(f"🎯 Gerando calendário com base no agente: **{agente['nome']}**")
+        st.success(f"Agente: {agente['nome']}")
         
-        # Configurações do calendário
-        col_cal1, col_cal2, col_cal3 = st.columns([2, 1, 1])
+        col1, col2 = st.columns([2, 1])
         
-        with col_cal1:
-            # Time frame e mês/ano
-            st.subheader("📅 Período do Calendário")
-            mes_ano = st.text_input("Mês/Ano para o calendário:", "AGOSTO 2025")
-            data_inicio = st.date_input("Data de início:", value=datetime.date(2025, 8, 1))
-            data_fim = st.date_input("Data de término:", value=datetime.date(2025, 8, 31))
+        with col1:
+            mes_ano = st.text_input("Mês/Ano:", "FEVEREIRO 2026")
+            data_inicio = st.date_input("Data início:", value=datetime.date(2026, 2, 1))
+            data_fim = st.date_input("Data fim:", value=datetime.date(2026, 2, 28))
             
-            # Validar datas
-            if data_inicio >= data_fim:
-                st.error("❌ A data de início deve ser anterior à data de término")
-            
-            # Calcular número de dias
             delta_dias = (data_fim - data_inicio).days + 1
-            dias_uteis = sum(1 for i in range(delta_dias) if (data_inicio + datetime.timedelta(days=i)).weekday() < 5)
-            st.info(f"📆 Período de {delta_dias} dias ({dias_uteis} dias úteis)")
             
-            # Configuração de culturas
-            st.subheader("🌱 Culturas para Foco")
             culturas_prioritarias = st.text_area(
-                "Lista de culturas para focar no calendário (separadas por vírgula):",
-                "Soja, Milho, Cana-de-açúcar, Algodão, Café, Trigo, HF",
-                help="Digite as culturas que serão priorizadas no calendário, separadas por vírgula"
+                "Culturas (separadas por vírgula, use 'e' para múltiplas):",
+                "Soja, Milho, Cana-de-açúcar, Algodão, Soja e Milho, Soja e Cana"
             )
-            # Processar culturas
-            culturas_lista = [cultura.strip() for cultura in culturas_prioritarias.split(",") if cultura.strip()]
+            culturas_lista = [c.strip() for c in culturas_prioritarias.split(",") if c.strip()]
         
-        with col_cal2:
-            st.subheader("🎯 Configurações de Pautas")
+        with col2:
+            dias_com_1_pauta = st.number_input("Dias com 1 pauta:", 0, delta_dias, 5)
+            dias_com_2_pautas = st.number_input("Dias com 2 pautas:", 0, delta_dias, 15)
+            dias_com_3_pautas = st.number_input("Dias com 3 pautas:", 0, delta_dias, 3)
+            dias_sem_pautas = delta_dias - (dias_com_1_pauta + dias_com_2_pautas + dias_com_3_pautas)
             
-            # Configuração de pautas apenas de culturas
-            st.write("**Pautas apenas de culturas:**")
-            pautas_apenas_culturas = st.slider(
-                "Número de pautas sem produtos:",
-                min_value=0,
-                max_value=30,
-                value=8,
-                help="Número total de pautas que serão apenas sobre culturas (sem produtos específicos)",
-                key="pautas_culturas"
-            )
-            
-            # Controles separados para dias com 2 e 3 pautas
-            st.write("**Dias com 2 pautas:**")
-            dias_com_2_pautas = st.slider(
-                "Número de dias com 2 pautas:",
-                min_value=0,
-                max_value=delta_dias,
-                value=max(0, delta_dias - 5),  # Valor padrão: total - 5
-                help="Dias que terão 2 pautas",
-                key="dias_2_pautas"
-            )
-            
-            st.write("**Dias com 3 pautas:**")
-            dias_com_3_pautas = st.slider(
-                "Número de dias com 3 pautas:",
-                min_value=0,
-                max_value=delta_dias,
-                value=min(5, delta_dias),  # Valor padrão: 5 ou total se menor
-                help="Dias que terão 3 pautas",
-                key="dias_3_pautas"
-            )
-            
-            # Configuração básica
-            usar_contexto_completo = st.checkbox("Usar contexto completo do agente", value=True,
-                                               help="Inclui brand guidelines, planejamento e comentários do agente")
+            if dias_sem_pautas < 0:
+                st.error("Total excede dias disponíveis")
         
-        with col_cal3:
-            st.subheader("📋 Diretrizes")
-            
-            # Configurações específicas
-            incluir_fins_semana = st.checkbox("Incluir sábado e domingo", value=False,
-                                            help="Incluir pautas nos fins de semana (opcional)")
-            verificar_datas_comemorativas = st.checkbox("Verificar datas comemorativas", value=True,
-                                                      help="Incluir pautas relacionadas a datas comemorativas do agro")
-            considerar_temporalidade = st.checkbox("Considerar temporalidade", value=True,
-                                                 help="Considerar época de uso dos produtos nas culturas")
-            
-            # Estatísticas automáticas com validação
-            st.subheader("📊 Estatísticas")
-            st.write(f"**Total de dias:** {delta_dias}")
-            
-            # Validar se a soma dos dias não excede o total
-            total_dias_configurados = dias_com_2_pautas + dias_com_3_pautas
-            dias_restantes = delta_dias - total_dias_configurados
-            
-            if total_dias_configurados > delta_dias:
-                st.error(f"❌ Total de dias configurados ({total_dias_configurados}) excede período ({delta_dias})")
-            else:
-                st.write(f"**Dias com 2 pautas:** {dias_com_2_pautas}")
-                st.write(f"**Dias com 3 pautas:** {dias_com_3_pautas}")
-                if dias_restantes > 0:
-                    st.write(f"**Dias sem pautas:** {dias_restantes}")
-                else:
-                    st.write("**Dias sem pautas:** 0")
-                
-                st.write(f"**Pautas só culturas:** {pautas_apenas_culturas}")
-                total_pautas = (dias_com_2_pautas * 2) + (dias_com_3_pautas * 3)
-                st.write(f"**Total de pautas:** {total_pautas}")
-                st.write(f"**Culturas:** {len(culturas_lista)}")
-        
-        # Input de produtos com culturas e direcionais
-        st.subheader("🏭 Produtos e Direcionais")
-        
-        st.info("💡 **Formato:** Produto - Cultura - Direcional (ex: Elestal Neo - Soja - Controle de mosca-branca)")
+        st.subheader("Produtos e Direcionais")
+        st.write("Formato: Produto(s) - Cultura(s) - Tema")
+        st.write("Ex: Elestal Neo e Fortenza - Soja e Milho - Controle de pragas")
         
         produtos_direcionais = st.text_area(
-            "Lista de produtos com culturas e direcionais (um por linha):",
-            """Elestal Neo - Soja - Controle de mosca-branca
-YieldOn - Soja - Bioativador para pegamento de flores
-Miravis - Soja - Fungicida para ferrugem
+            "Produtos com culturas e temas:",
+            """Verdavis, Megafol e Victrato - Soja e Milho - Tecnologia para feira
+Elestal Neo - Soja - Controle de mosca-branca
 Fortenza - Milho - Seedcare para cigarrinha
-Victrato - Cana - Nematicida para cana-soca""",
-            height=150,
-            help="Digite um produto por linha no formato: PRODUTO - CULTURA - DIRECIONAL"
+YieldOn - Soja - Bioativador para pegamento
+Miravis - Soja - Fungicida para ferrugem
+Victrato - Cana - Nematicida para cana-soca
+Victrato pelo Brasil - Soja e Cana - Ação nacional""",
+            height=150
         )
         
-        # Processar produtos com direcionais
         produtos_com_direcionais = []
         if produtos_direcionais:
             for linha in produtos_direcionais.split('\n'):
@@ -3420,429 +3338,211 @@ Victrato - Cana - Nematicida para cana-soca""",
                 if linha and ' - ' in linha:
                     partes = linha.split(' - ')
                     if len(partes) >= 3:
-                        produto = partes[0].strip()
-                        cultura = partes[1].strip()
-                        direcional = ' - '.join(partes[2:]).strip()
+                        produtos = [p.strip() for p in partes[0].split(' e ') if p.strip()]
+                        culturas = [c.strip() for c in partes[1].split(' e ') if c.strip()]
+                        tema = ' - '.join(partes[2:]).strip()
                         produtos_com_direcionais.append({
-                            'produto': produto,
-                            'cultura': cultura,
-                            'direcional': direcional
+                            'produtos': produtos,
+                            'culturas': culturas,
+                            'tema': tema
                         })
         
-        # Contexto adicional
-        st.subheader("📝 Contexto do Mês (Opcional)")
+        col_feira, col_recorrente = st.columns(2)
+        
+        with col_feira:
+            st.write("Semana com evento (1 post/dia):")
+            semana_feira_inicio = st.date_input("Início:", value=datetime.date(2026, 2, 9))
+            semana_feira_fim = st.date_input("Fim:", value=datetime.date(2026, 2, 13))
+            produtos_prioritarios_feira = st.text_input("Produtos prioritários:", "Verdavis, Megafol, Victrato")
+        
+        with col_recorrente:
+            pauta_recorrente_texto = st.text_input("Pauta fixa:", "Victrato pelo Brasil")
+            pauta_recorrente_dias = st.multiselect(
+                "Dias da semana:",
+                ["Terça", "Quinta"],
+                default=["Terça", "Quinta"]
+            )
+        
         contexto_mensal = st.text_area(
-            "Informações contextuais do mês para orientar as pautas:",
-            placeholder="""Exemplo para Janeiro:
-- Soja: colheita, enchimento, florescimento tardio
-- Milho safrinha: início do plantio
-- Cana: crescimento vegetativo máximo
-- Algodão: pico de plantio
-- Clima: chuvas intensas, atenção a doenças e pragas
-- Datas comemorativas: Dia do Solo (15/04), Dia do Milho (24/05)""",
-            height=120,
-            help="Contexto mensal para orientar as pautas, incluindo datas comemorativas se aplicável"
+            "Contexto do mês:",
+            """FEVEREIRO 2026:
+- Soja: colheita no centro-sul
+- Milho: plantio da safrinha
+- Cana: crescimento vegetativo
+- Evento: Feira Nacional do Agronegócio (09-13/02)
+- Foco: Verdavis, Megafol, Victrato na feira
+- Pauta fixa: Victrato pelo Brasil (terças e quintas)""",
+            height=120
         )
         
-        # Editorias disponíveis
-        st.subheader("📰 Editorias")
-        editorias_disponiveis = {
-            "🔵": "Dia a dia do campo",
-            "🟠": "Inovações e tendências", 
-            "🟢": "Sustentabilidade",
-            "🔴": "Mercado e safra",
-            "🟣": "Especialistas"
-        }
+        evitar_consecutivos_sem_pautas = st.checkbox("Evitar dias consecutivos sem pautas", True)
+        max_repeticoes_tema = st.slider("Máx repetições por tema:", 1, 5, 2)
         
-        editorias_selecionadas = st.multiselect(
-            "Selecione as editorias para o calendário:",
-            list(editorias_disponiveis.values()),
-            default=list(editorias_disponiveis.values()),
-            help="Editorias que serão utilizadas no calendário"
-        )
-        
-        # Função auxiliar para descrições das editorias
-        def get_editoria_description(editoria_nome):
-            descriptions = {
-                "Dia a dia do campo": "Pautas sobre cotidiano dos produtores, pragas, doenças, plantas daninhas, manejo e aplicação de produtos",
-                "Inovações e tendências": "Novas tecnologias, moléculas, equipamentos e futuro do agro",
-                "Sustentabilidade": "Práticas sustentáveis, produtos biológicos, saúde do solo, uso consciente",
-                "Mercado e safra": "Notícias sobre mercado, expectativas de safra, clima, preços e colheita", 
-                "Especialistas": "Conteúdos chancelados por autoridades no assunto"
-            }
-            return descriptions.get(editoria_nome, "Conteúdos diversos sobre o agro")
-        
-        # Botão para gerar calendário
-        if st.button("🔄 Gerar Calendário", type="primary", use_container_width=True):
+        if st.button("Gerar Calendário", type="primary"):
             if data_inicio >= data_fim:
-                st.error("❌ Corrija as datas antes de gerar o calendário")
+                st.error("Data início deve ser anterior")
             elif not culturas_lista:
-                st.error("❌ Digite pelo menos uma cultura")
-            elif (dias_com_2_pautas + dias_com_3_pautas) > delta_dias:
-                st.error(f"❌ Total de dias configurados ({dias_com_2_pautas + dias_com_3_pautas}) excede período ({delta_dias})")
+                st.error("Digite culturas")
+            elif (dias_com_1_pauta + dias_com_2_pautas + dias_com_3_pautas) > delta_dias:
+                st.error("Total excede período")
             else:
-                with st.spinner("🔄 Analisando temporalidade e gerando calendário visual..."):
+                with st.spinner("Gerando calendário..."):
                     try:
-                        # Construir contexto completo do agente
-                        contexto_agente = ""
-                        if usar_contexto_completo:
-                            contexto_agente = construir_contexto(agente, st.session_state.segmentos_selecionados)
-                        else:
-                            # Usar apenas base de conhecimento se disponível
-                            if "base_conhecimento" in st.session_state.segmentos_selecionados and agente.get('base_conhecimento'):
-                                contexto_agente = f"### BASE DE CONHECIMENTO ###\n{agente['base_conhecimento']}\n\n"
+                        contexto_agente = construir_contexto(agente, st.session_state.segmentos_selecionados)
                         
-                        # Mapear editorias selecionadas para emojis
-                        editorias_emoji = {}
-                        for emoji, nome in editorias_disponiveis.items():
-                            if nome in editorias_selecionadas:
-                                editorias_emoji[emoji] = nome
+                        info_especifica = f"""
+                        CONFIGURAÇÕES:
+                        1. SEMANA COM EVENTO ({semana_feira_inicio.strftime('%d/%m')} a {semana_feira_fim.strftime('%d/%m')}):
+                           - Apenas 1 pauta por dia
+                           - Priorizar: {produtos_prioritarios_feira}
                         
-                        # Calcular distribuição
-                        total_pautas = (dias_com_2_pautas * 2) + (dias_com_3_pautas * 3)
-                        dias_sem_pautas = delta_dias - (dias_com_2_pautas + dias_com_3_pautas)
+                        2. PAUTA FIXA: "{pauta_recorrente_texto}"
+                           - Dias: {', '.join(pauta_recorrente_dias)}
                         
-                        # Preparar informações de produtos com direcionais
-                        info_produtos_direcionais = ""
-                        if produtos_com_direcionais:
-                            info_produtos_direcionais = f"""
-                        **PRODUTOS COM CULTURAS E DIRECIONAIS:**
-                        {chr(10).join([f'- {p["produto"]} - {p["cultura"]} - {p["direcional"]}' for p in produtos_com_direcionais])}
+                        3. FREQUÊNCIA:
+                           - Dias com 1 pauta: {dias_com_1_pauta}
+                           - Dias com 2 pautas: {dias_com_2_pautas} 
+                           - Dias com 3 pautas: {dias_com_3_pautas}
+                           - Dias sem pautas: {max(0, dias_sem_pautas)}
+                           - Evitar consecutivos sem pautas: {evitar_consecutivos_sem_pautas}
                         
-                        Use estes produtos específicos com as culturas e direcionais indicados.
-                        Um mesmo produto pode aparecer com culturas diferentes para propósitos diferentes.
-                            """
-                        else:
-                            info_produtos_direcionais = "**PRODUTOS:** Use produtos relevantes da base de conhecimento, considerando a temporalidade de uso."
+                        4. CONTROLE REPETIÇÃO:
+                           - Máximo repetições por tema: {max_repeticoes_tema}
+                           - Células podem ter múltiplas culturas/produtos
+                        """
                         
-                        # Usar a função definida localmente
-                        editorias_info = "\n".join([f'   - {emoji} {nome}: {get_editoria_description(nome)}' for emoji, nome in editorias_emoji.items()])
-                        
-                        # Prompt para gerar o calendário
-                        prompt_calendario = f"""
+                        prompt_calendario = f'''
                         {contexto_agente}
 
-                        ## TAREFA: GERAR CALENDÁRIO DE PAUTAS CONSIDERANDO TEMPORALIDADE
+                        GERAR CALENDÁRIO COM ESTAS REGRAS:
 
-                        **INFORMAÇÕES:**
-                        - Mês/Ano: {mes_ano}
-                        - Data início: {data_inicio.strftime('%d/%m/%Y')}
-                        - Data término: {data_fim.strftime('%d/%m/%Y')}
-                        - Período: {delta_dias} dias ({dias_uteis} dias úteis)
-                        - Culturas prioritárias: {', '.join(culturas_lista)}
-                        - Editorias disponíveis: {', '.join([f'{emoji} {nome}' for emoji, nome in editorias_emoji.items()])}
+                        PERÍODO: {data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}
+                        MÊS: {mes_ano}
                         
-                        {info_produtos_direcionais}
+                        {info_especifica}
                         
-                        **DISTRIBUIÇÃO DE PAUTAS:**
-                        - Pautas apenas de culturas (sem produtos): {pautas_apenas_culturas} pautas
-                        - Dias com 2 pautas: {dias_com_2_pautas} dias
-                        - Dias com 3 pautas: {dias_com_3_pautas} dias
-                        - Dias sem pautas: {dias_sem_pautas} dias
-                        - Total de pautas: {total_pautas}
-                        - Incluir fins de semana: {incluir_fins_semana}
-
-                        **CONTEXTO DO MÊS:**
-                        {contexto_mensal if contexto_mensal else "Nenhum contexto mensal específico fornecido."}
-
-                        ## FORMATO EXATO EXIGIDO:
-
-                        Você DEVE gerar um CSV que quando aberto no Excel forme uma visualização de calendário mensal, seguindo EXATAMENTE este formato:
-
-                        Linha 1: ,,CALENDÁRIO DE PAUTAS,,,,[MÊS],,[ANO],,,,,,,,,,,,,,,,
-                        Linha 2: ,,{',,'.join([f'{emoji}- {nome}' for emoji, nome in editorias_emoji.items()])},,,,,,,,,,,,,,,,,
-                        Linha 3: ,,DOMINGO,SEGUNDA,TERÇA,QUARTA,QUINTA,SEXTA,SÁBADO,,,,,,,,,,,,,,,,,
-
-                        Depois, para cada semana:
-                        - Uma linha com os números dos dias (ex: ,,3,4,5,6,7,8,9)
-                        - Linhas com as pautas (2 ou 3 por dia conforme distribuição)
-
-                        ## REGRAS ESTRITAS:
-
-                        1. **FORMATO DAS PAUTAS:**
-                           - Pautas de produtos: "[EMOJI] NomeProduto – Cultura - TítuloMacro - BreveDescrição"
-                           - Pautas de culturas: "[EMOJI] Cultura - TítuloMacro - BreveDescrição"
-
-                        2. **DISTRIBUIÇÃO OBRIGATÓRIA:**
-                           - {pautas_apenas_culturas} pautas devem ser APENAS de culturas (sem produtos)
-                           - {dias_com_2_pautas} dias devem ter EXATAMENTE 2 pautas cada
-                           - {dias_com_3_pautas} dias devem ter EXATAMENTE 3 pautas cada
-                           - {dias_sem_pautas} dias devem ficar SEM PAUTAS
-                           - Priorizar segunda a sexta-feira, mas pode incluir sábado/domingo se solicitado
-
-                        3. **PRODUTOS E CULTURAS:**
-                           - Um mesmo produto pode aparecer com culturas diferentes para propósitos diferentes
-                           - Use os produtos com direcionais específicos quando fornecidos
-                           - Considere a temporalidade de uso dos produtos nas culturas
-
-                        4. **EXEMPLOS CORRETOS:**
-                           - Produto: "🔵 Elestal Neo - Soja - Ação contra mosca-branca - Reforçar uso do produto no controle da mosca-branca"
-                           - Produto com outra cultura: "🔵 Elestal Neo - Algodão - Proteção contra pulgões - Destaque para controle eficiente"
-                           - Cultura: "🟢 Soja - Pegamento de flores - Explicar fatores que causam abortamento floral"
-
-                        5. **BALANCEAMENTO:**
-                           - Distribuir pautas de culturas ao longo do mês (não concentrar em dias específicos)
-                           - Evitar repetição excessiva dos mesmos produtos no mesmo dia
-                           - Balancear editorias ao longo do mês
-                           - Variar culturas entre os dias
-                           - Dias com 3 pautas podem ter mais variedade de temas
-
-                        6. **CONTEÚDO RELEVANTE:**
-                           - Temas em linha com o momento do campo no mês
-                           - Considerar temporalidade de uso dos produtos
-                           - Destacar produtos mais relevantes para o período
-                           - {f"Incluir datas comemorativas se aplicável" if verificar_datas_comemorativas else "Não é necessário incluir datas comemorativas"}
-
-                        7. **TEMPORALIDADE:**
-                           - Analise qual é a época de uso de cada produto nas culturas
-                           - Priorize produtos que são mais relevantes para o período do calendário
-                           - Considere o estágio fenológico das culturas no mês
-                           - Destaque produtos com época de aplicação coincidente com o período
-
-                        8. **EDITORIAS:**
-                        {editorias_info}
-
-                        ## ESTRATÉGIA DE DISTRIBUIÇÃO:
-
-                        Para as {pautas_apenas_culturas} pautas apenas de culturas:
-                        - Distribua ao longo dos dias COM pautas, não concentre em dias específicos
-                        - Use para temas macro: expectativas de safra, clima, tendências
-                        - Exemplo: "🔴 Soja - Andamento da colheita - Análise do avanço da colheita e perspectivas de mercado"
-
-                        Para os {dias_com_2_pautas} dias com 2 pautas:
-                        - Mantenha foco em temas do dia a dia do campo
-                        - Balance entre produtos e culturas
-                        - Pode ser 1 produto + 1 cultura, ou 2 produtos diferentes
-
-                        Para os {dias_com_3_pautas} dias com 3 pautas:
-                        - Distribua entre diferentes culturas e editorias
-                        - Inclua variedade: 1 pauta de cultura + 2 de produtos, ou 3 produtos diferentes
-                        - Use para temas mais complexos ou campanhas especiais
-
-                        Para os {dias_sem_pautas} dias sem pautas:
-                        - Deixe as células vazias no calendário
-                        - Distribua esses dias de forma estratégica (fins de semana, feriados, etc.)
-
-                        **IMPORTANTE:**
-                        - Retorne APENAS o CSV completo, sem texto adicional
-                        - Formate EXATAMENTE como o exemplo fornecido
-                        - Garanta que seja um calendário visual legível no Excel
-                        - Siga a distribuição EXATA: {dias_com_2_pautas} dias com 2 pautas, {dias_com_3_pautas} dias com 3 pautas
-                        - {dias_sem_pautas} dias devem ficar completamente sem pautas
-                        - Considere a temporalidade de uso dos produtos
-                        - Um produto pode aparecer com múltiplas culturas
-                        - Distribua pautas de culturas ao longo do mês
-                        """
-
-                        # Gerar o calendário
+                        CONTEXTO: {contexto_mensal}
+                        
+                        PRODUTOS E TEMAS:
+                        {chr(10).join([f"- {', '.join(p['produtos'])} - {', '.join(p['culturas'])} - {p['tema']}" for p in produtos_com_direcionais])}
+                        
+                        REGRAS CRÍTICAS:
+                        1. Semana {semana_feira_inicio.strftime('%d/%m')} a {semana_feira_fim.strftime('%d/%m')}: APENAS 1 PAUTA POR DIA
+                        2. Priorizar produtos: {produtos_prioritarios_feira} na semana da feira
+                        3. Inserir "{pauta_recorrente_texto}" em TODAS as {', '.join(pauta_recorrente_dias)}
+                        4. NÃO repetir temas (máximo {max_repeticoes_tema} repetições)
+                        5. Células podem ter múltiplas culturas: "Soja e Milho", "Verdavis e Megafol"
+                        6. Praticamente todos os dias com conteúdo
+                        7. NUNCA 3 dias consecutivos sem pautas
+                        8. Baseie pautas no contexto do mês
+                        
+                        FORMATO:
+                        - Célula: "[EMOJI] Produto(s) - Cultura(s) - Tema - Breve descrição"
+                        - Ex: "🔵 Verdavis e Megafol - Soja e Milho - Tecnologia feira - Soluções apresentadas na feira"
+                        - Ex: "🟢 Victrato pelo Brasil - Soja e Cana - Ação nacional - Resultados em diferentes regiões"
+                        
+                        Retorne CSV pronto para Excel.
+                        '''
+                        
                         resposta = modelo_texto.generate_content(prompt_calendario)
                         calendario_csv = resposta.text
                         
-                        # Processar e exibir o resultado
-                        st.success("✅ Calendário visual gerado com sucesso!")
-                        
-                        # Limpar o CSV de possíveis markdown
                         calendario_limpo = calendario_csv.strip()
                         if '```csv' in calendario_limpo:
                             calendario_limpo = calendario_limpo.replace('```csv', '').replace('```', '')
                         if '```' in calendario_limpo:
                             calendario_limpo = calendario_limpo.replace('```', '')
                         
-                        # Salvar na sessão para usar na visualização
                         st.session_state.calendario_gerado = calendario_limpo
                         st.session_state.mes_ano_calendario = mes_ano
-                        st.session_state.distribuicao_pautas = {
-                            'pautas_apenas_culturas': pautas_apenas_culturas,
-                            'dias_2_pautas': dias_com_2_pautas,
-                            'dias_3_pautas': dias_com_3_pautas,
-                            'dias_sem_pautas': dias_sem_pautas,
-                            'total_pautas': total_pautas,
-                            'culturas': len(culturas_lista),
-                            'produtos_com_direcionais': len(produtos_com_direcionais)
-                        }
-                    
+                        
+                        st.success("Calendário gerado")
+                        
                     except Exception as e:
-                        st.error(f"❌ Erro ao gerar calendário: {str(e)}")
-                        st.info("💡 Dica: Verifique se o agente selecionado possui base de conhecimento relevante")
-
-        # Seção de visualização do calendário gerado
-        if 'calendario_gerado' in st.session_state and st.session_state.calendario_gerado:
-            st.markdown("---")
-            st.subheader(f"📊 Visualização do Calendário - {st.session_state.mes_ano_calendario}")
+                        st.error(f"Erro: {str(e)}")
+        
+        if 'calendario_gerado' in st.session_state:
+            st.subheader(f"Calendário - {st.session_state.mes_ano_calendario}")
             
-            # Mostrar distribuição utilizada
-            if hasattr(st.session_state, 'distribuicao_pautas'):
-                dist = st.session_state.distribuicao_pautas
-                col_dist1, col_dist2, col_dist3, col_dist4, col_dist5, col_dist6 = st.columns(6)
-                with col_dist1:
-                    st.metric("Dias 2 pautas", dist['dias_2_pautas'])
-                with col_dist2:
-                    st.metric("Dias 3 pautas", dist['dias_3_pautas'])
-                with col_dist3:
-                    st.metric("Dias sem pautas", dist['dias_sem_pautas'])
-                with col_dist4:
-                    st.metric("Pautas culturas", dist['pautas_apenas_culturas'])
-                with col_dist5:
-                    st.metric("Total pautas", dist['total_pautas'])
-                with col_dist6:
-                    st.metric("Produtos", dist['produtos_com_direcionais'])
-            
-            # Abas para diferentes visualizações
-            tab_csv, tab_tabela, tab_analise = st.tabs(["📋 CSV Original", "🗓️ Visualização em Tabela", "📈 Análise"])
+            tab_csv, tab_xlsx = st.tabs(["CSV", "XLSX"])
             
             with tab_csv:
-                st.subheader("📋 CSV para Download")
-                st.text_area("Conteúdo CSV:", st.session_state.calendario_gerado, height=400, key="csv_calendario")
+                st.text_area("CSV:", st.session_state.calendario_gerado, height=400)
                 
-                # Botão de download do CSV
                 st.download_button(
-                    "💾 Baixar Calendário CSV",
+                    "Baixar CSV",
                     data=st.session_state.calendario_gerado,
-                    file_name=f"calendario_pautas_{mes_ano.replace(' ', '_').lower()}_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                    mime="text/csv",
-                    type="primary"
+                    file_name=f"calendario_{mes_ano.replace(' ', '_').lower()}.csv",
+                    mime="text/csv"
                 )
-                
-                st.info("💡 **Dica:** Abra este arquivo CSV no Excel para visualizar o calendário em formato de grade")
             
-            with tab_tabela:
-                st.subheader("🗓️ Visualização em Tabela")
+            with tab_xlsx:
                 try:
-                    # Converter CSV para DataFrame para visualização
-                    import io
-                    import pandas as pd
+                    import openpyxl
+                    from openpyxl.styles import Font, Alignment, Border, Side
+                    from io import BytesIO
                     
-                    # Ler o CSV
-                    csv_data = io.StringIO(st.session_state.calendario_gerado)
-                    df = pd.read_csv(csv_data, header=None)
-                    
-                    # Mostrar a tabela
-                    st.dataframe(df, use_container_width=True, hide_index=True)
-                    
-                    # Estatísticas da tabela
-                    st.subheader("📊 Estatísticas da Tabela")
-                    col_stat1, col_stat2, col_stat3 = st.columns(3)
-                    with col_stat1:
-                        st.metric("Linhas", df.shape[0])
-                    with col_stat2:
-                        st.metric("Colunas", df.shape[1])
-                    with col_stat3:
-                        celulas_preenchidas = df.notna().sum().sum()
-                        st.metric("Células com conteúdo", celulas_preenchidas)
+                    def gerar_xlsx():
+                        wb = openpyxl.Workbook()
+                        ws = wb.active
+                        ws.title = f"Calendário {mes_ano}"
                         
+                        ws.merge_cells('A1:G1')
+                        ws['A1'] = f"CALENDÁRIO - {mes_ano}"
+                        ws['A1'].font = Font(bold=True, size=14)
+                        ws['A1'].alignment = Alignment(horizontal='center')
+                        
+                        dias_semana = ["DOMINGO", "SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO"]
+                        for col, dia in enumerate(dias_semana, 1):
+                            cell = ws.cell(row=3, column=col)
+                            cell.value = dia
+                            cell.font = Font(bold=True)
+                            cell.alignment = Alignment(horizontal='center')
+                        
+                        linhas = st.session_state.calendario_gerado.split('\n')
+                        linha_atual = 4
+                        
+                        for linha in linhas:
+                            if linha.strip() and not linha.startswith(',,'):
+                                celulas = linha.split(',')
+                                for col, conteudo in enumerate(celulas, 1):
+                                    if conteudo.strip():
+                                        cell = ws.cell(row=linha_atual, column=col)
+                                        cell.value = conteudo.strip()
+                                        cell.alignment = Alignment(wrap_text=True, vertical='top')
+                                        cell.border = Border(
+                                            left=Side(style='thin'),
+                                            right=Side(style='thin'),
+                                            top=Side(style='thin'),
+                                            bottom=Side(style='thin')
+                                        )
+                                linha_atual += 1
+                        
+                        for col in range(1, 8):
+                            ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = 30
+                            for row in range(4, linha_atual):
+                                ws.row_dimensions[row].height = 60
+                        
+                        buffer = BytesIO()
+                        wb.save(buffer)
+                        buffer.seek(0)
+                        return buffer
+                    
+                    if st.button("Gerar XLSX"):
+                        buffer_xlsx = gerar_xlsx()
+                        
+                        st.download_button(
+                            "Baixar XLSX",
+                            data=buffer_xlsx.getvalue(),
+                            file_name=f"calendario_{mes_ano.replace(' ', '_').lower()}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
+                    
+                except ImportError:
+                    st.write("Para XLSX: pip install openpyxl")
+                    st.code("pip install openpyxl")
                 except Exception as e:
-                    st.error(f"Erro ao processar tabela: {str(e)}")
-                    st.info("Visualizando como texto simples:")
-                    st.text(st.session_state.calendario_gerado)
-            
-            with tab_analise:
-                st.subheader("📈 Análise do Calendário")
-                
-                # Análise automática do conteúdo gerado
-                try:
-                    linhas = st.session_state.calendario_gerado.split('\n')
-                    pautas_encontradas = 0
-                    culturas_utilizadas = set()
-                    produtos_utilizados = set()
-                    editorias_utilizadas = set()
-                    
-                    # Mapeamento de emojis para editorias
-                    emoji_editoria = {
-                        '🔵': 'Dia a dia do campo',
-                        '🟠': 'Inovações e tendências',
-                        '🟢': 'Sustentabilidade', 
-                        '🔴': 'Mercado e safra',
-                        '🟣': 'Especialistas'
-                    }
-                    
-                    for linha in linhas:
-                        for emoji, editoria in emoji_editoria.items():
-                            if emoji in linha:
-                                editorias_utilizadas.add(editoria)
-                                pautas_encontradas += 1
-                                
-                                # Tentar extrair cultura
-                                if ' - ' in linha:
-                                    partes = linha.split(' - ')
-                                    if len(partes) >= 2:
-                                        # Segunda parte geralmente tem a cultura
-                                        cultura_candidata = partes[1].strip()
-                                        if cultura_candidata and len(cultura_candidata) < 50:  # Filtro simples
-                                            culturas_utilizadas.add(cultura_candidata)
-                                        
-                                        # Tentar identificar produto (primeira parte sem emoji)
-                                        produto_candidato = partes[0].replace(emoji, '').strip()
-                                        if produto_candidato and produto_candidato not in list(emoji_editoria.values()):
-                                            produtos_utilizados.add(produto_candidato)
-                    
-                    # Mostrar análise
-                    col_ana1, col_ana2, col_ana3 = st.columns(3)
-                    with col_ana1:
-                        st.metric("Pautas encontradas", pautas_encontradas)
-                    with col_ana2:
-                        st.metric("Culturas utilizadas", len(culturas_utilizadas))
-                    with col_ana3:
-                        st.metric("Produtos utilizados", len(produtos_utilizados))
-                    
-                    # Detalhes
-                    with st.expander("🔍 Detalhes das Culturas"):
-                        if culturas_utilizadas:
-                            st.write("**Culturas encontradas:**")
-                            for cultura in sorted(culturas_utilizadas):
-                                st.write(f"- {cultura}")
-                        else:
-                            st.info("Nenhuma cultura identificada automaticamente")
-                    
-                    with st.expander("🏭 Detalhes dos Produtos"):
-                        if produtos_utilizados:
-                            st.write("**Produtos encontrados:**")
-                            for produto in sorted(produtos_utilizados):
-                                st.write(f"- {produto}")
-                        else:
-                            st.info("Nenhum produto identificado automaticamente")
-                    
-                    with st.expander("📰 Distribuição por Editoria"):
-                        if editorias_utilizadas:
-                            st.write("**Editorias utilizadas:**")
-                            for editoria in sorted(editorias_utilizadas):
-                                st.write(f"- {editoria}")
-                        else:
-                            st.info("Nenhuma editoria identificada automaticamente")
-                            
-                except Exception as e:
-                    st.error(f"Erro na análise: {str(e)}")
-
-        # Seção de informações
-        with st.expander("ℹ️ Instruções de Uso"):
-            st.markdown("""
-            ### 🎯 Controles de Distribuição
-
-            **Dias com 2 pautas:**
-            - Configure quantos dias terão exatamente 2 pautas
-            - Ideal para dias com temas mais focados
-            - Exemplo: 15 dias com 2 pautas = 30 pautas
-
-            **Dias com 3 pautas:**
-            - Configure quantos dias terão exatamente 3 pautas  
-            - Para dias com maior variedade de conteúdo
-            - Exemplo: 10 dias com 3 pautas = 30 pautas
-
-            **Dias sem pautas:**
-            - Dias que ficarão vazios no calendário
-            - Calculado automaticamente: Total - (Dias 2 pautas + Dias 3 pautas)
-            - Útil para fins de semana, feriados, ou dias de menor movimento
-
-            **Pautas apenas de culturas:**
-            - Número total de pautas sem produtos específicos
-            - Distribuídas estrategicamente entre os dias com pautas
-
-            ### 💡 Dicas para Melhor Visualização
-
-            1. **No Excel:** Abra o arquivo CSV diretamente para ver o calendário em formato de grade
-            2. **No Google Sheets:** Importe o CSV para visualização similar
-            3. **Formatação:** As células estão organizadas para formar um calendário visual
-            4. **Cores:** Os emojis ajudam a identificar rapidamente o tipo de conteúdo
-            """)
+                    st.error(f"Erro XLSX: {str(e)}")
 
 # ========== ABA: GERADOR DE BRIEFINGS ==========
 with tab_briefings:
