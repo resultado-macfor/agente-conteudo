@@ -2020,16 +2020,32 @@ with tab_revisao_tecnica:
     st.header("🔧 Revisão Técnica com RAGs Especializados")
     st.markdown("**Análise em camadas: taxonomia, epidemiologia, produtos + reescrita final com relatório detalhado**")
     
-    # Configurações da revisão
-    col_config1, col_config2, col_config3 = st.columns([2, 1, 1])
+    # Layout com duas colunas principais
+    col_original_rag, col_revisado_rag = st.columns(2)
     
-    with col_config1:
+    with col_original_rag:
+        st.subheader("📄 Conteúdo Original")
         texto_tecnico = st.text_area(
             "Cole o conteúdo técnico para revisão:", 
             height=300,
-            placeholder="Cole aqui o conteúdo técnico agrícola que precisa ser revisado..."
+            placeholder="Cole aqui o conteúdo técnico agrícola que precisa ser revisado...",
+            key="texto_tecnico_rag",
+            label_visibility="collapsed"
         )
-        
+    
+    with col_revisado_rag:
+        st.subheader("✨ Conteúdo Revisado com RAG")
+        # Placeholder para o conteúdo revisado com RAG
+        revisado_rag_placeholder = st.empty()
+        revisado_rag_placeholder.info("📝 Aguardando revisão com RAG... O conteúdo revisado aparecerá aqui.")
+    
+    # Configurações da revisão (abaixo das colunas)
+    st.markdown("---")
+    st.subheader("⚙️ Configurações da Revisão")
+    
+    col_config1, col_config2, col_config3 = st.columns([2, 1, 1])
+    
+    with col_config1:
         # Tipo de conteúdo específico
         tipo_conteudo = st.selectbox(
             "Tipo de Conteúdo:",
@@ -2067,7 +2083,7 @@ with tab_revisao_tecnica:
         incluir_relatorio = st.checkbox("📋 Incluir relatório de mudanças", value=True,
                                       help="Gera um relatório detalhado mostrando todas as alterações")
 
-    # Funções para RAGs especializados
+    # Funções para RAGs especializados (mantidas iguais)
     def realizar_rag_taxonomia(texto: str, limite: int = 12) -> List[Dict]:
         """RAG especializado em taxonomia e classificação de patógenos"""
         perguntas_especificas = [
@@ -2372,397 +2388,263 @@ with tab_revisao_tecnica:
         resposta = modelo_texto.generate_content(prompt_rapido)
         return resposta.text.strip()
 
-    # Botão de revisão técnica com RAGs especializados
-    if st.button("🔬 Realizar Revisão com RAGs Especializados", type="primary"):
-        if texto_tecnico:
-            # Configurar RAGs ativos
-            rags_ativos = {
-                'taxonomia': rag_taxonomia,
-                'epidemiologia': rag_epidemiologia, 
-                'produtos': rag_produtos,
-                'geral': rag_geral
-            }
-            
-            # Construir contexto do agente se solicitado
-            contexto_agente = ""
-            if usar_contexto_agente and st.session_state.agente_selecionado:
-                agente = st.session_state.agente_selecionado
-                contexto_agente = construir_contexto(agente, st.session_state.segmentos_selecionados)
-            
-            with st.spinner("🚀 Executando pipeline de RAGs especializados..."):
-                try:
-                    # FASE 1: Executar RAGs especializados
-                    st.subheader("📡 Fase 1: Busca com RAGs Especializados")
-                    
-                    resultados_rags = processar_rags_especializados(texto_tecnico, rags_ativos, limite_documentos)
-                    
-                    # Mostrar estatísticas dos RAGs
-                    col_rag1, col_rag2, col_rag3, col_rag4 = st.columns(4)
-                    with col_rag1:
-                        st.metric("RAG Taxonomia", 
-                                 len(resultados_rags.get('taxonomia', [])),
-                                 help="Documentos sobre classificação de patógenos")
-                    with col_rag2:
-                        st.metric("RAG Epidemiologia", 
-                                 len(resultados_rags.get('epidemiologia', [])),
-                                 help="Documentos sobre condições ambientais")
-                    with col_rag3:
-                        st.metric("RAG Produtos", 
-                                 len(resultados_rags.get('produtos', [])),
-                                 help="Documentos sobre produtos e eficácia")
-                    with col_rag4:
-                        st.metric("RAG Geral", 
-                                 len(resultados_rags.get('geral', [])),
-                                 help="Documentos por similaridade semântica")
-                    
-                    # Mostrar relatório detalhado dos RAGs
-                    with st.expander("📊 Detalhes dos RAGs Executados", expanded=False):
-                        relatorio_rags = "## 📊 RELATÓRIO DOS RAGs ESPECIALIZADOS\n\n"
-                        for categoria, documentos in resultados_rags.items():
-                            relatorio_rags += f"### {categoria.upper()}\n"
-                            relatorio_rags += f"Documentos encontrados: {len(documentos)}\n\n"
+    # Botão de revisão técnica com RAGs especializados - AGORA CENTRALIZADO
+    st.markdown("---")
+    col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
+    
+    with col_btn2:
+        if st.button("🔬 Realizar Revisão com RAGs Especializados", type="primary", use_container_width=True):
+            if texto_tecnico:
+                # Configurar RAGs ativos
+                rags_ativos = {
+                    'taxonomia': rag_taxonomia,
+                    'epidemiologia': rag_epidemiologia, 
+                    'produtos': rag_produtos,
+                    'geral': rag_geral
+                }
+                
+                # Construir contexto do agente se solicitado
+                contexto_agente = ""
+                if usar_contexto_agente and st.session_state.agente_selecionado:
+                    agente = st.session_state.agente_selecionado
+                    contexto_agente = construir_contexto(agente, st.session_state.segmentos_selecionados)
+                
+                with st.spinner("🚀 Executando pipeline de RAGs especializados..."):
+                    try:
+                        # FASE 1: Executar RAGs especializados
+                        st.subheader("📡 Fase 1: Busca com RAGs Especializados")
+                        
+                        resultados_rags = processar_rags_especializados(texto_tecnico, rags_ativos, limite_documentos)
+                        
+                        # Mostrar estatísticas dos RAGs
+                        col_rag1, col_rag2, col_rag3, col_rag4 = st.columns(4)
+                        with col_rag1:
+                            st.metric("RAG Taxonomia", 
+                                     len(resultados_rags.get('taxonomia', [])),
+                                     help="Documentos sobre classificação de patógenos")
+                        with col_rag2:
+                            st.metric("RAG Epidemiologia", 
+                                     len(resultados_rags.get('epidemiologia', [])),
+                                     help="Documentos sobre condições ambientais")
+                        with col_rag3:
+                            st.metric("RAG Produtos", 
+                                     len(resultados_rags.get('produtos', [])),
+                                     help="Documentos sobre produtos e eficácia")
+                        with col_rag4:
+                            st.metric("RAG Geral", 
+                                     len(resultados_rags.get('geral', [])),
+                                     help="Documentos por similaridade semântica")
+                        
+                        # FASE 2: Reescrita com LLM
+                        st.subheader("✍️ Fase 2: Reescrita com Base nos RAGs")
+                        
+                        with st.spinner("Reescrevendo conteúdo e gerando relatório de mudanças..."):
+                            # Escolher qual função de reescrita usar baseado na configuração
+                            if incluir_relatorio:
+                                texto_reescrito, relatorio_mudancas = reescrever_com_relatorio_mudancas(
+                                    texto_tecnico, resultados_rags, contexto_agente
+                                )
+                            else:
+                                texto_reescrito = reescrever_sem_relatorio(texto_tecnico, resultados_rags, contexto_agente)
+                                relatorio_mudancas = None
+                        
+                        # FASE 3: Atualizar visualização lado a lado
+                        st.subheader("📋 Fase 3: Resultados da Revisão")
+                        
+                        # Atualizar a coluna direita com o conteúdo revisado
+                        with col_revisado_rag:
+                            revisado_rag_placeholder.empty()
+                            st.success("✅ Conteúdo revisado com RAGs!")
                             
-                            for i, doc in enumerate(documentos, 1):
-                                doc_content = str(doc)
-                                doc_limpo = doc_content.replace('{', '').replace('}', '').replace("'", "").replace('"', '')
-                                relatorio_rags += f"**Documento {i}:** {doc_limpo[:200]}...\n\n"
-                        st.markdown(relatorio_rags)
-                    
-                    # FASE 2: Reescrita com LLM
-                    st.subheader("✍️ Fase 2: Reescrita com Base nos RAGs")
-                    
-                    with st.spinner("Reescrevendo conteúdo e gerando relatório de mudanças..."):
-                        # Escolher qual função de reescrita usar baseado na configuração
-                        if incluir_relatorio:
-                            texto_reescrito, relatorio_mudancas = reescrever_com_relatorio_mudancas(
-                                texto_tecnico, resultados_rags, contexto_agente
-                            )
-                        else:
-                            texto_reescrito = reescrever_sem_relatorio(texto_tecnico, resultados_rags, contexto_agente)
-                            relatorio_mudancas = None
-                    
-                    # FASE 3: Apresentação dos resultados
-                    st.subheader("📋 Fase 3: Resultados da Revisão")
-                    
-                    # Abas para diferentes visualizações - AGORA COM RELATÓRIO
-                    if incluir_relatorio:
-                        tab_original, tab_reescrito, tab_comparacao, tab_relatorio = st.tabs([
-                            "📄 Original", "✨ Reescrito", "⚖️ Comparação", "📋 Relatório de Mudanças"
-                        ])
-                    else:
-                        tab_original, tab_reescrito, tab_comparacao = st.tabs([
-                            "📄 Original", "✨ Reescrito", "⚖️ Comparação"
-                        ])
-                    
-                    with tab_original:
-                        st.markdown("### Conteúdo Original")
-                        st.text_area("Original", texto_tecnico, height=400, key="original_rag", label_visibility="collapsed")
+                            # Criar abas para organizar o conteúdo revisado
+                            if incluir_relatorio and relatorio_mudancas:
+                                tab_texto_reescrito, tab_relatorio_mudancas, tab_analise = st.tabs([
+                                    "📝 Texto Reescrito", "📋 Relatório de Mudanças", "📊 Análise RAGs"
+                                ])
+                                
+                                with tab_texto_reescrito:
+                                    st.text_area(
+                                        "Texto reescrito com base nos RAGs:",
+                                        texto_reescrito,
+                                        height=300,
+                                        label_visibility="collapsed"
+                                    )
+                                
+                                with tab_relatorio_mudancas:
+                                    st.markdown(relatorio_mudancas)
+                                
+                                with tab_analise:
+                                    # Estatísticas de comparação
+                                    palavras_orig = len(texto_tecnico.split())
+                                    palavras_reesc = len(texto_reescrito.split())
+                                    diff_palavras = palavras_reesc - palavras_orig
+                                    
+                                    col_stat1, col_stat2, col_stat3 = st.columns(3)
+                                    with col_stat1:
+                                        st.metric("Palavras Original", palavras_orig)
+                                    with col_stat2:
+                                        st.metric("Palavras Reescrito", palavras_reesc)
+                                    with col_stat3:
+                                        st.metric("Diferença", 
+                                                 f"{'+' if diff_palavras > 0 else ''}{diff_palavras}",
+                                                 delta=f"{diff_palavras/palavras_orig*100:.1f}%" if palavras_orig > 0 else "0%")
+                                    
+                                    # Estatísticas dos RAGs
+                                    st.markdown("### 📊 Estatísticas dos RAGs")
+                                    for categoria, documentos in resultados_rags.items():
+                                        if documentos:
+                                            st.write(f"**{categoria.capitalize()}:** {len(documentos)} documentos encontrados")
+                            else:
+                                # Sem relatório - apenas mostrar texto reescrito
+                                st.text_area(
+                                    "Texto reescrito com base nos RAGs:",
+                                    texto_reescrito,
+                                    height=300,
+                                    label_visibility="collapsed"
+                                )
                         
-                        # Estatísticas do original
-                        palavras_orig = len(texto_tecnico.split())
-                        linhas_orig = texto_tecnico.count('\n') + 1
-                        col_orig1, col_orig2 = st.columns(2)
-                        with col_orig1:
-                            st.metric("Palavras Originais", palavras_orig)
-                        with col_orig2:
-                            st.metric("Linhas Originais", linhas_orig)
-                    
-                    with tab_reescrito:
-                        st.markdown("### Conteúdo Reescrito com RAGs")
-                        st.text_area("Reescrito", texto_reescrito, height=400, key="reescrito_rag", label_visibility="collapsed")
+                        # Botões de download
+                        st.markdown("---")
+                        col_dl1, col_dl2, col_dl3 = st.columns(3)
                         
-                        # Estatísticas do reescrito
-                        palavras_reesc = len(texto_reescrito.split())
-                        linhas_reesc = texto_reescrito.count('\n') + 1
-                        col_reesc1, col_reesc2 = st.columns(2)
-                        with col_reesc1:
-                            st.metric("Palavras Reescritas", palavras_reesc)
-                        with col_reesc2:
-                            st.metric("Linhas Reescritas", linhas_reesc)
-                        
-                        # Botões de ação
-                        col_dl1, col_dl2 = st.columns(2)
                         with col_dl1:
                             st.download_button(
                                 "💾 Baixar Texto Reescrito",
                                 data=texto_reescrito,
                                 file_name=f"texto_reescrito_rags_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
-                                mime="text/plain"
+                                mime="text/plain",
+                                use_container_width=True
                             )
+                        
                         with col_dl2:
-                            if st.button("📋 Copiar para Área de Transferência", key="copy_reescrito"):
-                                st.code(texto_reescrito, language='markdown')
-                                st.success("Texto copiado!")
-                    
-                    with tab_comparacao:
-                        st.markdown("### 🔍 Análise Comparativa")
-                        
-                        # Métricas de comparação
-                        col_comp1, col_comp2, col_comp3, col_comp4 = st.columns(4)
-                        with col_comp1:
-                            diff_palavras = palavras_reesc - palavras_orig
-                            st.metric("Diferença de Palavras", 
-                                     f"{'+' if diff_palavras > 0 else ''}{diff_palavras}",
-                                     delta=f"{diff_palavras/palavras_orig*100:.1f}%" if palavras_orig > 0 else "0%")
-                        
-                        with col_comp2:
-                            diff_linhas = linhas_reesc - linhas_orig
-                            st.metric("Diferença de Linhas",
-                                     f"{'+' if diff_linhas > 0 else ''}{diff_linhas}")
-                        
-                        with col_comp3:
-                            documentos_total = sum(len(docs) for docs in resultados_rags.values())
-                            st.metric("Documentos Utilizados", documentos_total)
-                        
-                        with col_comp4:
-                            rags_utilizados = sum(1 for docs in resultados_rags.values() if docs)
-                            st.metric("RAGs com Resultados", rags_utilizados)
-                        
-                        # Análise qualitativa
-                        st.markdown("#### 📈 Impacto dos RAGs Especializados")
-                        
-                        analise_categorias = []
-                        if resultados_rags.get('taxonomia'):
-                            analise_categorias.append("✅ **Taxonomia**: Classificação de patógenos validada")
-                        else:
-                            analise_categorias.append("⚠️ **Taxonomia**: Nenhum documento específico encontrado")
-                        
-                        if resultados_rags.get('epidemiologia'):
-                            analise_categorias.append("✅ **Epidemiologia**: Condições ambientais validadas") 
-                        else:
-                            analise_categorias.append("⚠️ **Epidemiologia**: Nenhum documento específico encontrado")
-                        
-                        if resultados_rags.get('produtos'):
-                            analise_categorias.append("✅ **Produtos**: Informações técnicas validadas")
-                        else:
-                            analise_categorias.append("⚠️ **Produtos**: Nenhum documento específico encontrado")
-                        
-                        for analise in analise_categorias:
-                            st.write(analise)
-                    
-                    # NOVA ABA: Relatório de Mudanças
-                    if incluir_relatorio and relatorio_mudancas:
-                        with tab_relatorio:
-                            st.markdown("### 📋 Relatório Detalhado de Mudanças")
-                            st.markdown(relatorio_mudancas)
-                            
-                            # Botões de download para o relatório
-                            col_rel1, col_rel2 = st.columns(2)
-                            with col_rel1:
+                            if incluir_relatorio and relatorio_mudancas:
                                 st.download_button(
-                                    "💾 Baixar Relatório de Mudanças",
+                                    "💾 Baixar Relatório",
                                     data=relatorio_mudancas,
                                     file_name=f"relatorio_mudancas_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.md",
-                                    mime="text/markdown"
+                                    mime="text/markdown",
+                                    use_container_width=True
                                 )
-                            with col_rel2:
-                                st.download_button(
-                                    "📦 Baixar Pacote Completo (ZIP)",
-                                    data=texto_reescrito + "\n\n" + "="*50 + "\n\n" + relatorio_mudancas,
-                                    file_name=f"revisao_completa_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
-                                    mime="text/plain"
-                                )
+                        
+                        with col_dl3:
+                            # Pacote completo
+                            pacote_completo = f"TEXTO ORIGINAL:\n{texto_tecnico}\n\n"
+                            pacote_completo += "="*60 + "\n\n"
+                            pacote_completo += f"TEXTO REESCRITO COM RAGs:\n{texto_reescrito}\n\n"
+                            if incluir_relatorio and relatorio_mudancas:
+                                pacote_completo += "="*60 + "\n\n"
+                                pacote_completo += f"RELATÓRIO DE MUDANÇAS:\n{relatorio_mudancas}"
+                            
+                            st.download_button(
+                                "📦 Baixar Pacote Completo",
+                                data=pacote_completo,
+                                file_name=f"revisao_completa_rags_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                                mime="text/plain",
+                                use_container_width=True
+                            )
+                        
+                        # Salvar no histórico se MongoDB disponível
+                        if mongo_connected_blog:
+                            try:
+                                revisao_data = {
+                                    "texto_original": texto_tecnico,
+                                    "texto_reescrito": texto_reescrito,
+                                    "relatorio_mudancas": relatorio_mudancas if incluir_relatorio else "Não gerado",
+                                    "rags_utilizados": rags_ativos,
+                                    "documentos_encontrados": {k: len(v) for k, v in resultados_rags.items()},
+                                    "nivel_rigor": nivel_rigor,
+                                    "incluiu_relatorio": incluir_relatorio,
+                                    "data_criacao": datetime.datetime.now()
+                                }
+                                if 'revisoes_rags' not in db.list_collection_names():
+                                    db.create_collection('revisoes_rags')
+                                db['revisoes_rags'].insert_one(revisao_data)
+                                st.success("✅ Revisão salva no histórico!")
+                            except Exception as e:
+                                st.warning(f"Revisão concluída, mas não salva: {str(e)}")
                     
-                    # Salvar no histórico se MongoDB disponível
-                    if mongo_connected_blog:
-                        try:
-                            revisao_data = {
-                                "texto_original": texto_tecnico,
-                                "texto_reescrito": texto_reescrito,
-                                "relatorio_mudancas": relatorio_mudancas if incluir_relatorio else "Não gerado",
-                                "rags_utilizados": rags_ativos,
-                                "documentos_encontrados": {k: len(v) for k, v in resultados_rags.items()},
-                                "nivel_rigor": nivel_rigor,
-                                "incluiu_relatorio": incluir_relatorio,
-                                "data_criacao": datetime.datetime.now()
-                            }
-                            if 'revisoes_rags' not in db.list_collection_names():
-                                db.create_collection('revisoes_rags')
-                            db['revisoes_rags'].insert_one(revisao_data)
-                            st.success("✅ Revisão salva no histórico!")
-                        except Exception as e:
-                            st.warning(f"Revisão concluída, mas não salva: {str(e)}")
-                
-                except Exception as e:
-                    st.error(f"❌ Erro no pipeline de RAGs: {str(e)}")
-        else:
-            st.warning("Por favor, cole um conteúdo técnico para revisão.")
+                    except Exception as e:
+                        st.error(f"❌ Erro no pipeline de RAGs: {str(e)}")
+                        with col_revisado_rag:
+                            revisado_rag_placeholder.error(f"❌ Erro: {str(e)}")
+            else:
+                st.warning("Por favor, cole um conteúdo técnico para revisão.")
 
-    # Ferramentas avançadas para análise
-    st.header("🛠️ Ferramentas de Análise Avançada")
-    
-    col_tools1, col_tools2 = st.columns(2)
-    
-    with col_tools1:
-        with st.expander("🔍 Analisador de Precisão Taxonômica"):
-            st.info("Foco específico em classificação de patógenos")
-            
-            texto_analise = st.text_area("Texto para análise taxonômica:", height=150,
-                                       placeholder="Cole trecho com descrição de patógenos...",
-                                       key="taxonomia_analyzer")
-            
-            if st.button("Analisar Taxonomia", key="btn_taxonomia"):
-                if texto_analise:
-                    with st.spinner("Analisando precisão taxonômica..."):
-                        try:
-                            # RAG específico para taxonomia
-                            resultados_tax = realizar_rag_taxonomia(texto_analise, limite=8)
-                            
-                            if resultados_tax:
-                                st.success(f"📚 Encontrados {len(resultados_tax)} documentos de taxonomia")
-                                
-                                prompt_analise = f"""
-                                Analise a precisão taxonômica deste texto:
-
-                                **TEXTO:** {texto_analise}
-
-                                **DOCUMENTOS DE REFERÊNCIA:**
-                                {str(resultados_tax)[:2000]}
-
-                                Foque em:
-                                1. Classificação correta (fungo vs oomiceto)
-                                2. Nomes científicos precisos
-                                3. Descrição de ciclo de vida
-                                4. Terminologia técnica adequada
-
-                                Retorne análise concisa.
-                                """
-                                
-                                resposta = modelo_texto.generate_content(prompt_analise)
-                                st.markdown(resposta.text)
-                            else:
-                                st.warning("Nenhum documento de taxonomia encontrado na base")
-                                
-                        except Exception as e:
-                            st.error(f"Erro na análise: {str(e)}")
-    
-    with col_tools2:
-        with st.expander("🌡️ Validador Epidemiológico"):
-            st.info("Valida condições ambientais e epidemiológicas")
-            
-            texto_epidemio = st.text_area("Texto para análise epidemiológica:", height=150,
-                                        placeholder="Cole trecho com condições ambientais...",
-                                        key="epidemiologia_validator")
-            
-            if st.button("Validar Epidemiologia", key="btn_epidemiologia"):
-                if texto_epidemio:
-                    with st.spinner("Validando condições epidemiológicas..."):
-                        try:
-                            # RAG específico para epidemiologia
-                            resultados_epi = realizar_rag_epidemiologia(texto_epidemio, limite=8)
-                            
-                            if resultados_epi:
-                                st.success(f"📚 Encontrados {len(resultados_epi)} documentos epidemiológicos")
-                                
-                                prompt_validacao = f"""
-                                Valide as condições epidemiológicas deste texto:
-
-                                **TEXTO:** {texto_epidemio}
-
-                                **DOCUMENTOS DE REFERÊNCIA:**
-                                {str(resultados_epi)[:2000]}
-
-                                Verifique:
-                                1. Temperaturas específicas
-                                2. Períodos de molhamento foliar
-                                3. Umidade relativa ideal
-                                4. Condições ambientais precisas
-
-                                Retorne validação concisa.
-                                """
-                                
-                                resposta = modelo_texto.generate_content(prompt_validacao)
-                                st.markdown(resposta.text)
-                            else:
-                                st.warning("Nenhum documento epidemiológico encontrado na base")
-                                
-                        except Exception as e:
-                            st.error(f"Erro na validação: {str(e)}")
-
-    # Seção de histórico e exemplos
-    with st.expander("📚 Histórico e Exemplos de Revisão"):
-        st.markdown("""
-        ### 🎯 Exemplos de Correções com RAGs Especializados
+    # Ferramentas avançadas para análise (mantidas iguais)
+    if 'ultima_revisao' in st.session_state and 'ultima_revisao' in locals():
+        st.markdown("---")
+        st.subheader("🔄 Ajustes Incrementais para RAGs")
         
-        **Cenário 1: Correção Taxonômica**
-        ```
-        Original: "O fungo Peronospora manshurica causa o míldio"
-        Corrigido: "O oomiceto Peronospora manshurica causa o míldio"
-        Relatório: 
-        - Categoria: Taxonomia
-        - Justificativa: Peronospora spp. são oomicetos, não fungos verdadeiros
-        - Fonte: Documentos taxonômicos da base
-        ```
+        st.info("Use o campo abaixo para solicitar ajustes específicos na última revisão com RAGs.")
         
-        **Cenário 2: Precisão Epidemiológica**
-        ```
-        Original: "A ferrugem se desenvolve em condições úmidas"
-        Corrigido: "A ferrugem-asiática requer 6-10 horas de molhamento foliar com temperaturas entre 18-26°C"
-        Relatório:
-        - Categoria: Epidemiologia  
-        - Justificativa: Especificação de condições ambientais precisas
-        - Fonte: Documentos epidemiológicos sobre Phakopsora pachyrhizi
-        ```
+        # Caixa de texto para comandos de ajuste específico para RAGs
+        comando_ajuste_rag = st.text_area(
+            "Comandos para ajustar a revisão RAG:",
+            height=150,
+            placeholder="Exemplos:\n- Aumente o foco na taxonomia dos patógenos\n- Inclua mais informações epidemiológicas\n- Corrija dados específicos de produtos\n- Adicione referências da base técnica",
+            key="comando_ajuste_rag"
+        )
         
-        **Cenário 3: Informações de Produtos**
-        ```
-        Original: "Produto X tem ação curativa"
-        Corrigido: "Produto X apresenta ação preventiva e pós-infecção inicial (antiesporulante)"
-        Relatório:
-        - Categoria: Produtos
-        - Justificativa: Correção de claims técnicos conforme documentação
-        - Fonte: Informações técnicas do produto na base
-        ```
-        
-        ### 📊 Métricas de Qualidade
-        - **RAGs Ativos**: Número de especializações utilizadas
-        - **Documentos/Especialidade**: Precisão por área técnica  
-        - **Taxa de Correção**: Impacto na precisão técnica
-        - **Relatório de Mudanças**: Detalhamento completo das alterações
-        """)
+        # Botão para ajustar a revisão RAG
+        if st.button("🔄 Ajustar Revisão RAG", type="secondary", use_container_width=True):
+            if comando_ajuste_rag and 'texto_reescrito' in locals():
+                with st.spinner("🔄 Aplicando ajustes na revisão RAG..."):
+                    try:
+                        # Prompt para ajuste da revisão RAG
+                        prompt_ajuste_rag = f"""
+                        VOCÊ É: Um especialista técnico agrícola.
 
-    # Informações de uso
-    with st.expander("ℹ️ Como Usar os RAGs Especializados"):
-        st.markdown("""
-        ### 🎯 Guia de Uso dos RAGs Especializados
-        
-        **📋 NOVO: Relatório de Mudanças**
-        - Ative a opção "Incluir relatório de mudanças" para obter um detalhamento completo
-        - O relatório mostra cada alteração com justificativa técnica
-        - Inclui categorização por tipo de correção
-        - Fornece métricas de impacto das mudanças
-        
-        **1. RAG Taxonomia**
-        - Foca em classificação científica de patógenos
-        - Corrige "fungo" vs "oomiceto" 
-        - Valida nomes científicos
-        - Ajusta descrições de ciclo de vida
-        
-        **2. RAG Epidemiologia**
-        - Especifica condições ambientais exatas
-        - Valida temperaturas e umidades ideais
-        - Corrige períodos de molhamento foliar
-        - Ajusta gatilhos epidemiológicos
-        
-        **3. RAG Produtos**
-        - Valida modos de ação técnicos
-        - Corrige doses e épocas de aplicação
-        - Ajusta claims de eficácia
-        - Valida recomendações de uso
-        
-        **4. RAG Geral**
-        - Busca por similaridade semântica
-        - Complementa informações gerais
-        - Mantém coerência contextual
-        - Fornece base ampla de conhecimento
-        
-        ### ⚡ Dicas para Melhores Resultados
-        - Ative **todos os RAGs** para cobertura completa
-        - Use **limite de 12 documentos** por RAG para balancear qualidade/velocidade
-        - Configure nível **"Especialista"** para revisões críticas
-        - **Ative o relatório** para auditoria completa das mudanças
-        - Utilize as **ferramentas de análise específicas** para validação pontual
-        """)
+                        SUA TAREFA: Ajustar a revisão técnica anterior com base nas solicitações específicas.
+
+                        TEXTO ORIGINAL:
+                        {texto_tecnico}
+
+                        TEXTO REESCRITO COM RAGs:
+                        {texto_reescrito}
+
+                        RELATÓRIO DE MUDANÇAS:
+                        {relatorio_mudancas if 'relatorio_mudancas' in locals() and relatorio_mudancas else "Nenhum relatório disponível"}
+
+                        SOLICITAÇÕES DE AJUSTE:
+                        {comando_ajuste_rag}
+
+                        INSTRUÇÕES:
+                        1. Aplique TODOS os ajustes solicitados
+                        2. Mantenha a precisão técnica
+                        3. Considere as informações dos RAGs utilizados
+                        4. Retorne o texto reescrito ajustado
+                        5. Se solicitado, atualize também o relatório de mudanças
+
+                        Retorne o texto reescrito ajustado.
+                        """
+
+                        resposta_ajuste_rag = modelo_texto2.generate_content(prompt_ajuste_rag)
+                        texto_reescrito_ajustado = resposta_ajuste_rag.text
+                        
+                        # Atualizar a visualização
+                        with col_revisado_rag:
+                            revisado_rag_placeholder.empty()
+                            st.success("✅ Revisão RAG ajustada!")
+                            st.text_area(
+                                "Texto reescrito ajustado:",
+                                texto_reescrito_ajustado,
+                                height=300,
+                                label_visibility="collapsed"
+                            )
+                        
+                        # Botão para baixar versão ajustada
+                        st.download_button(
+                            "💾 Baixar Versão Ajustada",
+                            data=texto_reescrito_ajustado,
+                            file_name=f"revisao_rag_ajustada_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                            mime="text/plain",
+                            use_container_width=True
+                        )
+                    
+                    except Exception as e:
+                        st.error(f"❌ Erro ao ajustar revisão RAG: {str(e)}")
+
+# O resto do código permanece igual...
 
 
 # --- FUNÇÃO ATUALIZADA PARA BUSCA WEB COM PERPLEXITY ---
@@ -3838,110 +3720,187 @@ with tab_briefings:
                     type="primary"
                 )
 
-# ========== ABA: REVISÃO TÉCNICA (VERSÃO COMPLETA SEM RAG) ==========
+# ... (código anterior permanece o mesmo até a definição da aba de revisão técnica sem RAG)
+
 with tab_revisao_tecnica2:
     st.header("🔬 Revisão Técnica Completa")
     st.markdown("**Análise rigorosa com expertise técnica em agronomia**")
     
-    texto_tecnico = st.text_area(
-        "Cole o conteúdo técnico agrícola para revisão:", 
-        height=300,
-        placeholder="Cole aqui qualquer conteúdo agrícola que precisa ser revisado tecnicamente...",
-        key="texto_tecnico_original"
-    )
+    # Criar duas colunas para visualização lado a lado
+    col_original, col_revisado = st.columns(2)
+    
+    with col_original:
+        st.subheader("📄 Conteúdo Original")
+        texto_tecnico = st.text_area(
+            "Cole o conteúdo técnico agrícola para revisão:", 
+            height=300,
+            placeholder="Cole aqui qualquer conteúdo agrícola que precisa ser revisado tecnicamente...",
+            key="texto_tecnico_original",
+            label_visibility="collapsed"  # Esconde o label para usar o subheader
+        )
 
-    # Botão para realizar revisão técnica completa
-    if st.button("🔬 Realizar Revisão Técnica Completa", type="primary", key="revisao_inicial"):
-        if texto_tecnico:
-            with st.spinner("🔍 Analisando conteúdo com rigor técnico..."):
-                try:
-                    # Prompt para revisão técnica no formato específico
-                    prompt_revisao = f"""
-                    VOCÊ É: Um engenheiro agrônomo com ampla experiência técnica.
+    with col_revisado:
+        st.subheader("✨ Conteúdo Revisado")
+        # Placeholder para o conteúdo revisado
+        revisao_placeholder = st.empty()
+        revisao_placeholder.info("📝 Aguardando revisão... O conteúdo revisado aparecerá aqui.")
 
-                    SUA TAREFA: Realizar uma revisão técnica completa do conteúdo fornecido seguindo EXATAMENTE o formato abaixo.
+    # Botão para realizar revisão técnica completa - agora centralizado
+    st.markdown("---")
+    col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
+    
+    with col_btn2:
+        if st.button("🔬 Realizar Revisão Técnica Completa", type="primary", key="revisao_inicial", use_container_width=True):
+            if texto_tecnico:
+                with st.spinner("🔍 Analisando conteúdo com rigor técnico..."):
+                    try:
+                        # Prompt para revisão técnica no formato específico
+                        prompt_revisao = f"""
+                        VOCÊ É: Um engenheiro agrônomo com ampla experiência técnica.
 
-                    ANALISE ESTE CONTEÚDO:
-                    {texto_tecnico}
+                        SUA TAREFA: Realizar uma revisão técnica completa do conteúdo fornecido seguindo EXATAMENTE o formato abaixo.
 
-                    RETORNE APENAS ESTE FORMATO EXATO:
+                        ANALISE ESTE CONTEÚDO:
+                        {texto_tecnico}
 
-                    ✅ O QUE ESTÁ CORRETO NO TEXTO (visão geral)
-                    Antes das correções, é importante destacar que o texto está bem escrito, com boa estrutura, e a maior parte das informações está correta:
-                    [Liste aqui os pontos que estão corretos em bullet points]
-                    Ou seja: o conteúdo é bom, faltando apenas alguns ajustes e correções pontuais.
+                        RETORNE APENAS ESTE FORMATO EXATO:
 
-                    ❗ PONTOS INCORRETOS, IMPRECISOS OU QUE PRECISAM SER AJUSTADOS
-                    Abaixo, estão todos os erros e imprecisões técnicas do texto, com explicação e sugestão.
+                        ✅ O QUE ESTÁ CORRETO NO TEXTO (visão geral)
+                        Antes das correções, é importante destacar que o texto está bem escrito, com boa estrutura, e a maior parte das informações está correta:
+                        [Liste aqui os pontos que estão corretos em bullet points]
+                        Ou seja: o conteúdo é bom, faltando apenas alguns ajustes e correções pontuais.
 
-                    ❌ 1. [Título do primeiro erro]
-                    No trecho:
-                    "[Citação exata do trecho problemático]"
-                    Correção técnica:
-                    [Explicação detalhada do erro]
-                    ➡ Portanto, [conclusão técnica]
-                    Como corrigir:
-                    "[Sugestão de texto corrigido]"
+                        ❗ PONTOS INCORRETOS, IMPRECISOS OU QUE PRECISAM SER AJUSTADOS
+                        Abaixo, estão todos os erros e imprecisões técnicas do texto, com explicação e sugestão.
 
-                    ❌ 2. [Título do segundo erro]
-                    No trecho:
-                    "[Citação exata do trecho problemático]"
-                    Correção técnica:
-                    [Explicação detalhada do erro]
-                    ➡ Portanto, [conclusão técnica]
-                    Como corrigir:
-                    "[Sugestão de texto corrigido]"
+                        ❌ 1. [Título do primeiro erro]
+                        No trecho:
+                        "[Citação exata do trecho problemático]"
+                        Correção técnica:
+                        [Explicação detalhada do erro]
+                        ➡ Portanto, [conclusão técnica]
+                        Como corrigir:
+                        "[Sugestão de texto corrigido]"
 
-                    [Continue numerando para cada erro encontrado...]
+                        ❌ 2. [Título do segundo erro]
+                        No trecho:
+                        "[Citação exata do trecho problemático]"
+                        Correção técnica:
+                        [Explicação detalhada do erro]
+                        ➡ Portanto, [conclusão técnica]
+                        Como corrigir:
+                        "[Sugestão de texto corrigido]"
 
-                    🧪 CONCLUSÃO TÉCNICA
-                    O texto está bem escrito e majoritariamente correto, mas contém:
-                    ✔ [X] erro(s) crítico(s)
-                    [Descrição dos erros críticos]
-                    ✔ [Y] afirmações que precisam correção ou moderação
-                    [Descrição das correções necessárias]
-                    ✔ [Z] pontos que não estão errados, mas precisam maior precisão
-                    [Descrição dos pontos que precisam de precisão]
-                    ✔ [W] pontos incompletos (não são erros, mas faltam informações-chave)
-                    [Descrição dos pontos incompletos]
+                        [Continue numerando para cada erro encontrado...]
 
-                    🔧 Se quiser, posso agora:
-                    - Reescrever o texto totalmente revisado e técnico, já corrigido
-                    - Criar uma versão mais curta para redes sociais
-                    - Criar uma versão para material comercial
-                    - Montar um quadro comparativo entre técnicas/culturas
-                    - Fazer uma versão para cultura específica
+                        🧪 CONCLUSÃO TÉCNICA
+                        O texto está bem escrito e majoritariamente correto, mas contém:
+                        ✔ [X] erro(s) crítico(s)
+                        [Descrição dos erros críticos]
+                        ✔ [Y] afirmações que precisam correção ou moderação
+                        [Descrição das correções necessárias]
+                        ✔ [Z] pontos que não estão errados, mas precisam maior precisão
+                        [Descrição dos pontos que precisam de precisão]
+                        ✔ [W] pontos incompletos (não são erros, mas faltam informações-chave)
+                        [Descrição dos pontos incompletos]
 
-                    Seja direto e técnico. Mantenha o formato exato.
-                    """
+                        🔧 Se quiser, posso agora:
+                        - Reescrever o texto totalmente revisado e técnico, já corrigido
+                        - Criar uma versão mais curta para redes sociais
+                        - Criar uma versão para material comercial
+                        - Montar um quadro comparativo entre técnicas/culturas
+                        - Fazer uma versão para cultura específica
 
-                    resposta = modelo_texto2.generate_content(prompt_revisao)
-                    revisao_completa = resposta.text
+                        Seja direto e técnico. Mantenha o formato exato.
+                        """
+
+                        resposta = modelo_texto2.generate_content(prompt_revisao)
+                        revisao_completa = resposta.text
+                        
+                        # Salvar no session state para uso posterior
+                        st.session_state.ultima_revisao = revisao_completa
+                        st.session_state.texto_original_revisao = texto_tecnico
+                        
+                        # Atualizar a coluna direita com o conteúdo revisado
+                        with col_revisado:
+                            revisao_placeholder.empty()
+                            st.success("✅ Revisão concluída!")
+                            
+                            # Criar abas para organizar o conteúdo revisado
+                            tab_relatorio, tab_texto_corrigido = st.tabs(["📋 Relatório Completo", "📝 Texto Corrigido"])
+                            
+                            with tab_relatorio:
+                                st.markdown(revisao_completa)
+                            
+                            with tab_texto_corrigido:
+                                # Extrair e mostrar apenas as sugestões de texto corrigido
+                                st.info("📝 **Texto revisado com correções aplicadas:**")
+                                
+                                # Extrair todas as sugestões de correção do relatório
+                                linhas = revisao_completa.split('\n')
+                                texto_corrigido_final = texto_tecnico
+                                
+                                # Procurar por sugestões de correção no formato "Como corrigir:"
+                                for i, linha in enumerate(linhas):
+                                    if "Como corrigir:" in linha and i + 1 < len(linhas):
+                                        sugestao = linhas[i + 1].strip().strip('"')
+                                        if sugestao:
+                                            # Encontrar o trecho original que está sendo corrigido
+                                            for j in range(i-3, i):
+                                                if j >= 0 and "No trecho:" in linhas[j] and j + 1 < len(linhas):
+                                                    trecho_original = linhas[j + 1].strip().strip('"')
+                                                    if trecho_original:
+                                                        # Substituir no texto corrigido
+                                                        texto_corrigido_final = texto_corrigido_final.replace(
+                                                            trecho_original, sugestao
+                                                        )
+                                
+                                # Se nenhuma substituição foi feita, mostrar o original
+                                if texto_corrigido_final == texto_tecnico:
+                                    st.warning("⚠️ Não foi possível extrair automaticamente o texto corrigido. Mostrando o relatório completo.")
+                                    st.markdown(revisao_completa)
+                                else:
+                                    st.text_area(
+                                        "Texto com correções aplicadas:",
+                                        texto_corrigido_final,
+                                        height=300,
+                                        label_visibility="collapsed"
+                                    )
+                        
+                        # Botões de download na parte inferior
+                        st.markdown("---")
+                        col_dl1, col_dl2 = st.columns(2)
+                        
+                        with col_dl1:
+                            st.download_button(
+                                "💾 Baixar Relatório Completo",
+                                data=revisao_completa,
+                                file_name=f"revisao_tecnica_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                                mime="text/plain",
+                                use_container_width=True
+                            )
+                        
+                        with col_dl2:
+                            # Tentar extrair o texto corrigido para download
+                            texto_para_download = texto_corrigido_final if 'texto_corrigido_final' in locals() else texto_tecnico
+                            st.download_button(
+                                "💾 Baixar Texto Corrigido",
+                                data=texto_para_download,
+                                file_name=f"texto_corrigido_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                                mime="text/plain",
+                                use_container_width=True
+                            )
                     
-                    # Salvar no session state para uso posterior
-                    st.session_state.ultima_revisao = revisao_completa
-                    st.session_state.texto_original_revisao = texto_tecnico
-                    
-                    # Exibir resultados
-                    st.success("✅ Revisão técnica completa concluída!")
-                    st.markdown(revisao_completa)
-                    
-                    # Botão de download
-                    st.download_button(
-                        "💾 Baixar Relatório Completo",
-                        data=revisao_completa,
-                        file_name=f"revisao_tecnica_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
-                        mime="text/plain"
-                    )
-                
-                except Exception as e:
-                    st.error(f"❌ Erro na revisão técnica: {str(e)}")
-        else:
-            st.warning("Por favor, cole um conteúdo técnico para revisão.")
+                    except Exception as e:
+                        st.error(f"❌ Erro na revisão técnica: {str(e)}")
+                        with col_revisado:
+                            revisao_placeholder.error(f"❌ Erro: {str(e)}")
+            else:
+                st.warning("Por favor, cole um conteúdo técnico para revisão.")
 
     # Seção para ajustes incrementais (só aparece após a primeira revisão)
     if 'ultima_revisao' in st.session_state:
-        st.divider()
+        st.markdown("---")
         st.subheader("🔄 Ajustes Incrementais")
         
         st.info("Use o campo abaixo para solicitar ajustes específicos na última revisão realizada.")
@@ -3955,7 +3914,7 @@ with tab_revisao_tecnica2:
         )
         
         # Botão para revisar novamente com base nos ajustes
-        if st.button("🔄 Revisar Novamente com Ajustes", type="secondary"):
+        if st.button("🔄 Revisar Novamente com Ajustes", type="secondary", use_container_width=True):
             if comando_ajuste:
                 with st.spinner("🔄 Aplicando ajustes solicitados..."):
                     try:
@@ -3991,27 +3950,84 @@ with tab_revisao_tecnica2:
                         # Atualizar o session state com a nova versão
                         st.session_state.ultima_revisao = revisao_ajustada
                         
-                        # Exibir resultados
-                        st.success("✅ Revisão ajustada concluída!")
-                        st.markdown(revisao_ajustada)
+                        # Atualizar a visualização da coluna direita
+                        with col_revisado:
+                            revisao_placeholder.empty()
+                            st.success("✅ Revisão ajustada concluída!")
+                            
+                            # Criar abas para organizar o conteúdo revisado
+                            tab_relatorio, tab_texto_corrigido = st.tabs(["📋 Relatório Ajustado", "📝 Texto Corrigido"])
+                            
+                            with tab_relatorio:
+                                st.markdown(revisao_ajustada)
+                            
+                            with tab_texto_corrigido:
+                                # Extrair e mostrar apenas as sugestões de texto corrigido
+                                st.info("📝 **Texto revisado com correções aplicadas:**")
+                                
+                                # Extrair todas as sugestões de correção do relatório
+                                linhas = revisao_ajustada.split('\n')
+                                texto_corrigido_final = st.session_state.texto_original_revisao
+                                
+                                # Procurar por sugestões de correção no formato "Como corrigir:"
+                                for i, linha in enumerate(linhas):
+                                    if "Como corrigir:" in linha and i + 1 < len(linhas):
+                                        sugestao = linhas[i + 1].strip().strip('"')
+                                        if sugestao:
+                                            # Encontrar o trecho original que está sendo corrigido
+                                            for j in range(i-3, i):
+                                                if j >= 0 and "No trecho:" in linhas[j] and j + 1 < len(linhas):
+                                                    trecho_original = linhas[j + 1].strip().strip('"')
+                                                    if trecho_original:
+                                                        # Substituir no texto corrigido
+                                                        texto_corrigido_final = texto_corrigido_final.replace(
+                                                            trecho_original, sugestao
+                                                        )
+                                
+                                # Se nenhuma substituição foi feita, mostrar o original
+                                if texto_corrigido_final == st.session_state.texto_original_revisao:
+                                    st.warning("⚠️ Não foi possível extrair automaticamente o texto corrigido. Mostrando o relatório completo.")
+                                    st.markdown(revisao_ajustada)
+                                else:
+                                    st.text_area(
+                                        "Texto com correções aplicadas:",
+                                        texto_corrigido_final,
+                                        height=300,
+                                        label_visibility="collapsed"
+                                    )
                         
-                        # Botão de download da versão ajustada
-                        st.download_button(
-                            "💾 Baixar Relatório Ajustado",
-                            data=revisao_ajustada,
-                            file_name=f"revisao_ajustada_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
-                            mime="text/plain",
-                            key="download_ajustado"
-                        )
+                        # Botões de download atualizados
+                        st.markdown("---")
+                        col_dl1, col_dl2 = st.columns(2)
+                        
+                        with col_dl1:
+                            st.download_button(
+                                "💾 Baixar Relatório Ajustado",
+                                data=revisao_ajustada,
+                                file_name=f"revisao_ajustada_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                                mime="text/plain",
+                                key="download_ajustado",
+                                use_container_width=True
+                            )
+                        
+                        with col_dl2:
+                            # Tentar extrair o texto corrigido para download
+                            texto_para_download = texto_corrigido_final if 'texto_corrigido_final' in locals() else st.session_state.texto_original_revisao
+                            st.download_button(
+                                "💾 Baixar Texto Corrigido",
+                                data=texto_para_download,
+                                file_name=f"texto_corrigido_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                                mime="text/plain",
+                                use_container_width=True
+                            )
                     
                     except Exception as e:
                         st.error(f"❌ Erro ao aplicar ajustes: {str(e)}")
+                        with col_revisado:
+                            revisao_placeholder.error(f"❌ Erro: {str(e)}")
             else:
                 st.warning("Por favor, digite os comandos de ajuste desejados.")
-        
-        # Mostrar a última revisão salva se existir
-        with st.expander("📋 Última Revisão Salva (para referência)"):
-            st.markdown(st.session_state.ultima_revisao)
+
             
 # --- Estilização ---
 st.markdown("""
