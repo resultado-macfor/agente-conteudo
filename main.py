@@ -24,7 +24,7 @@ from sentence_transformers import SentenceTransformer
 import openai
 
 def get_bigquery_client():
-    """Função auxiliar para obter cliente BigQuery de forma segura"""
+    '''Função auxiliar para obter cliente BigQuery de forma segura'''
     try:
         from google.cloud import bigquery
         from google.oauth2 import service_account
@@ -71,7 +71,7 @@ GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 @st.cache_resource
 
 def load_resource_models():
-    """Carrega todos os modelos necessários incluindo BigQuery com credenciais seguras"""
+    '''Carrega todos os modelos necessários incluindo BigQuery com credenciais seguras'''
     
     # 1. Configurar Gemini
     try:
@@ -155,13 +155,13 @@ def load_resource_models():
 
 
 class BigQueryClient:
-    """Classe wrapper para busca vetorial no BigQuery."""
+    '''Classe wrapper para busca vetorial no BigQuery.'''
     def __init__(self, client):
         self.client = client
         print("✅ BigQueryClient inicializado para busca vetorial.")
         
     def vector_search(self, colecao: str, vector: List[float], limit: int = 10) -> List[Dict]:
-        """Realiza busca por similaridade vetorial na tabela nova."""
+        '''Realiza busca por similaridade vetorial na tabela nova.'''
         if not colecao or colecao == "ERRO":
             return []
             
@@ -169,7 +169,7 @@ class BigQueryClient:
             vector_str = str(vector)
             table_id = "gen-lang-client-0949885382.teste_julia.teste_tabela"
             
-            query = f"""
+            query = f'''
             SELECT 
                 chunk_id,
                 chunk_text,
@@ -184,7 +184,7 @@ class BigQueryClient:
             WHERE colecao = '{colecao}'
             ORDER BY similarity_score ASC
             LIMIT {limit}
-            """
+            '''
             
             query_job = self.client.query(query)
             results = query_job.result()
@@ -245,9 +245,9 @@ modelo_texto_openai = LLMClient(api_key=OPENAI_API_KEY)
 
 #FUNÇÕES ESPECÍFICAS DESSA ABA DE REVISÃO TÉCNICA 
 def classificar_texto(texto: str) -> Optional[str]:
-    prompt = f"""Analise o texto e classifique-o em: PRODUTO, CULTURA ou OUTROS.
+    prompt = f'''Analise o texto e classifique-o em: PRODUTO, CULTURA ou OUTROS.
     Texto: "{texto}"
-    Retorne apenas a palavra em capslook: PRODUTO, CULTURA OU OUTROS."""
+    Retorne apenas a palavra em capslook: PRODUTO, CULTURA OU OUTROS.'''
 
 
     try:
@@ -261,7 +261,7 @@ def classificar_texto(texto: str) -> Optional[str]:
 
 
 def get_embedding(text: str) -> List[float]:
-    """Usa o SentenceTransformer carregado no cache."""
+    '''Usa o SentenceTransformer carregado no cache.'''
     return st_model.encode(text).tolist()
 
 
@@ -297,7 +297,7 @@ def reescrever_revisor(content: str, colecao_override: Optional[str] = None) -> 
     modelo_texto_openai = LLMClient(api_key=OPENAI_API_KEY)
     
     # 4. Prompt Final
-    final_prompt = f"""
+    final_prompt = f'''
     Você é um **Revisor Técnico Sênior** com foco na área agrícola.
     CORRIGIR imprecisões e ENRIQUECER o texto com os dados do referencial.
     
@@ -311,7 +311,7 @@ def reescrever_revisor(content: str, colecao_override: Optional[str] = None) -> 
     1. TEXTO REVISADO E CORRIGIDO
     2. 🛠️ Ajustes Técnicos e Correções (lista de alterações e fontes usadas)
     3. Você deve dizer todas as fontes utilizadas 
-    """
+    '''
     
     return modelo_texto_openai.generate_content(final_prompt)
 
@@ -337,7 +337,7 @@ class AstraDBClient:
         }
     
     def vector_search(self, collection: str, vector: List[float], limit: int = 6) -> List[Dict]:
-        """Realiza busca por similaridade vetorial"""
+        '''Realiza busca por similaridade vetorial'''
         url = f"{self.base_url}/{collection}"
         payload = {
             "find": {
@@ -358,7 +358,7 @@ class AstraDBClient:
 astra_client = AstraDBClient()
 
 def reescrever_com_rag_blog(content: str) -> str:
-    """REESCREVE conteúdo de blog usando RAG - SAÍDA DIRETA DO CONTEÚDO REESCRITO"""
+    '''REESCREVE conteúdo de blog usando RAG - SAÍDA DIRETA DO CONTEÚDO REESCRITO'''
     try:
         # Gera embedding para busca
         embedding = get_embedding(content[:800])
@@ -379,7 +379,7 @@ def reescrever_com_rag_blog(content: str) -> str:
             rag_context = "Base de conhecimento não retornou resultados específicos."
 
         # Prompt de entendimento RAG
-        rewrite_prompt = f"""
+        rewrite_prompt = f'''
 
         Entenda o que no texto original de fato é enriquecido e corrigido pelo referencial teórico. Considere que você não pode tangenciar o assunto do texto original.
     
@@ -392,13 +392,13 @@ def reescrever_com_rag_blog(content: str) -> str:
         ###END REFERENCIAL TEÓRICO###
         
         
-        """
+        '''
 
         # Gera conteúdo REEESCRITO
         pre_response = modelo_texto.generate_content(rewrite_prompt)
 
         # Saída final
-        final_prompt = f"""
+        final_prompt = f'''
     
         ###BEGIN TEXTO ORIGINAL###
         {content}
@@ -424,7 +424,7 @@ def reescrever_com_rag_blog(content: str) -> str:
 
 
         RETORNE O CONTEÚDO REEESCRITO FINAL, apontando as mudanças em uma subseção ao final.
-        """
+        '''
         
         response = modelo_texto.generate_content(final_prompt)
  
@@ -435,7 +435,7 @@ def reescrever_com_rag_blog(content: str) -> str:
         return content
 
 def reescrever_com_rag_revisao_SEO(content: str) -> str:
-    """REESCREVE conteúdo técnico para revisão - SAÍDA DIRETA DO CONTEÚDO REESCRITO"""
+    '''REESCREVE conteúdo técnico para revisão - SAÍDA DIRETA DO CONTEÚDO REESCRITO'''
     try:
         # Gera embedding para busca
         embedding = get_embedding(content[:800])
@@ -455,7 +455,7 @@ def reescrever_com_rag_revisao_SEO(content: str) -> str:
             rag_context = "Consulta técnica não retornou documentos específicos."
 
         # Prompt de REWRITE TÉCNICO AVANÇADO
-        rewrite_prompt = f"""
+        rewrite_prompt = f'''
         CONTEÚDO TÉCNICO ORIGINAL PARA REESCRITA COMPLETA:
         {content}
 
@@ -480,7 +480,7 @@ def reescrever_com_rag_revisao_SEO(content: str) -> str:
 
 
         RETORNE O CONTEÚDO REEESCRITO FINAL, apontando as mudanças em uma subseção ao final.
-        """
+        '''
 
         # Gera conteúdo técnico REEESCRITO
         response = modelo_texto.generate_content(rewrite_prompt)
@@ -491,7 +491,7 @@ def reescrever_com_rag_revisao_SEO(content: str) -> str:
         return content
 
 def reescrever_com_rag_revisao_NORM(content: str) -> str:
-    """REESCREVE conteúdo técnico para revisão - SAÍDA DIRETA DO CONTEÚDO REESCRITO"""
+    '''REESCREVE conteúdo técnico para revisão - SAÍDA DIRETA DO CONTEÚDO REESCRITO'''
     try:
         # Gera embedding para busca
         embedding = get_embedding(content[:800])
@@ -511,7 +511,7 @@ def reescrever_com_rag_revisao_NORM(content: str) -> str:
             rag_context = "Consulta técnica não retornou documentos específicos."
 
         # Prompt de REWRITE TÉCNICO AVANÇADO
-        rewrite_prompt = f"""
+        rewrite_prompt = f'''
         CONTEÚDO TÉCNICO ORIGINAL PARA REESCRITA COMPLETE:
         {content}
 
@@ -537,7 +537,7 @@ def reescrever_com_rag_revisao_NORM(content: str) -> str:
 
 
         RETORNE O CONTEÚDO REEESCRITO FINAL, apontando as mudanças em uma subseção ao final.
-        """
+        '''
 
         # Gera conteúdo técnico REEESCRITO
         response = modelo_texto.generate_content(rewrite_prompt)
@@ -568,11 +568,11 @@ users = {
 }
 
 def get_current_user():
-    """Retorna o usuário atual da sessão"""
+    '''Retorna o usuário atual da sessão'''
     return st.session_state.get('user', 'unknown')
 
 def login():
-    """Formulário de login"""
+    '''Formulário de login'''
     
     with st.form("login_form"):
         username = st.text_input("Usuário")
@@ -615,7 +615,7 @@ modelo_texto2 = genai.GenerativeModel("gemini-2.5-pro")
 
 # --- Funções CRUD para Agentes ---
 def criar_agente(nome, system_prompt, base_conhecimento, comments, planejamento, categoria, agente_mae_id=None, herdar_elementos=None):
-    """Cria um novo agente no MongoDB"""
+    '''Cria um novo agente no MongoDB'''
     agente = {
         "nome": nome,
         "system_prompt": system_prompt,
@@ -633,7 +633,7 @@ def criar_agente(nome, system_prompt, base_conhecimento, comments, planejamento,
     return result.inserted_id
 
 def listar_agentes():
-    """Retorna todos os agentes ativos do usuário atual ou todos se admin"""
+    '''Retorna todos os agentes ativos do usuário atual ou todos se admin'''
     current_user = get_current_user()
     if current_user == "admin":
         return list(collection_agentes.find({"ativo": True}).sort("data_criacao", -1))
@@ -644,7 +644,7 @@ def listar_agentes():
         }).sort("data_criacao", -1))
 
 def listar_agentes_para_heranca(agente_atual_id=None):
-    """Retorna todos os agentes ativos que podem ser usados como mãe"""
+    '''Retorna todos os agentes ativos que podem ser usados como mãe'''
     current_user = get_current_user()
     query = {"ativo": True}
     
@@ -661,7 +661,7 @@ def listar_agentes_para_heranca(agente_atual_id=None):
     return list(collection_agentes.find(query).sort("data_criacao", -1))
 
 def obter_agente(agente_id):
-    """Obtém um agente específico pelo ID com verificação de permissão"""
+    '''Obtém um agente específico pelo ID com verificação de permissão'''
     if isinstance(agente_id, str):
         agente_id = ObjectId(agente_id)
     
@@ -676,7 +676,7 @@ def obter_agente(agente_id):
     return None
 
 def atualizar_agente(agente_id, nome, system_prompt, base_conhecimento, comments, planejamento, categoria, agente_mae_id=None, herdar_elementos=None):
-    """Atualiza um agente existente com verificação de permissão"""
+    '''Atualiza um agente existente com verificação de permissão'''
     if isinstance(agente_id, str):
         agente_id = ObjectId(agente_id)
     
@@ -702,7 +702,7 @@ def atualizar_agente(agente_id, nome, system_prompt, base_conhecimento, comments
     )
 
 def desativar_agente(agente_id):
-    """Desativa um agente (soft delete) com verificação de permissão"""
+    '''Desativa um agente (soft delete) com verificação de permissão'''
     if isinstance(agente_id, str):
         agente_id = ObjectId(agente_id)
     
@@ -717,7 +717,7 @@ def desativar_agente(agente_id):
     )
 
 def obter_agente_com_heranca(agente_id):
-    """Obtém um agente com os elementos herdados aplicados"""
+    '''Obtém um agente com os elementos herdados aplicados'''
     agente = obter_agente(agente_id)
     if not agente or not agente.get('agente_mae_id'):
         return agente
@@ -742,7 +742,7 @@ def obter_agente_com_heranca(agente_id):
     return agente_completo
 
 def salvar_conversa(agente_id, mensagens, segmentos_utilizados=None):
-    """Salva uma conversa no histórico"""
+    '''Salva uma conversa no histórico'''
     if isinstance(agente_id, str):
         agente_id = ObjectId(agente_id)
     conversa = {
@@ -754,7 +754,7 @@ def salvar_conversa(agente_id, mensagens, segmentos_utilizados=None):
     return collection_conversas.insert_one(conversa)
 
 def obter_conversas(agente_id, limite=10):
-    """Obtém o histórico de conversas de um agente"""
+    '''Obtém o histórico de conversas de um agente'''
     if isinstance(agente_id, str):
         agente_id = ObjectId(agente_id)
     return list(collection_conversas.find(
@@ -763,7 +763,7 @@ def obter_conversas(agente_id, limite=10):
 
 # --- Função para construir contexto com segmentos selecionados ---
 def construir_contexto(agente, segmentos_selecionados, historico_mensagens=None):
-    """Constrói o contexto com base nos segmentos selecionados"""
+    '''Constrói o contexto com base nos segmentos selecionados'''
     contexto = ""
     
     if "system_prompt" in segmentos_selecionados and agente.get('system_prompt'):
@@ -791,7 +791,7 @@ def construir_contexto(agente, segmentos_selecionados, historico_mensagens=None)
 
 # --- Funções para Transcrição de Áudio/Video ---
 def transcrever_audio_video(arquivo, tipo_arquivo):
-    """Transcreve áudio ou vídeo usando a API do Gemini"""
+    '''Transcreve áudio ou vídeo usando a API do Gemini'''
     try:
         client = genai.Client(api_key=gemini_api_key)
         
@@ -826,10 +826,10 @@ def transcrever_audio_video(arquivo, tipo_arquivo):
 
 # --- Configuração de Autenticação de Administrador ---
 def check_admin_password():
-    """Retorna True se o usuário fornecer a senha de admin correta."""
+    '''Retorna True se o usuário fornecer a senha de admin correta.'''
     
     def admin_password_entered():
-        """Verifica se a senha de admin está correta."""
+        '''Verifica se a senha de admin está correta.'''
         if st.session_state["admin_password"] == "senha123":
             st.session_state["admin_password_correct"] = True
             st.session_state["admin_user"] = "admin"
@@ -1336,7 +1336,7 @@ with tab_conteudo:
 
     # Função para extrair texto de diferentes tipos de arquivo
     def extrair_texto_arquivo(arquivo):
-        """Extrai texto de diferentes formatos de arquivo"""
+        '''Extrai texto de diferentes formatos de arquivo'''
         try:
             extensao = arquivo.name.split('.')[-1].lower()
             
@@ -1355,7 +1355,7 @@ with tab_conteudo:
             return f"Erro ao extrair texto do arquivo {arquivo.name}: {str(e)}"
 
     def extrair_texto_pdf(arquivo):
-        """Extrai texto de arquivos PDF"""
+        '''Extrai texto de arquivos PDF'''
         try:
             import PyPDF2
             pdf_reader = PyPDF2.PdfReader(arquivo)
@@ -1367,7 +1367,7 @@ with tab_conteudo:
             return f"Erro na leitura do PDF: {str(e)}"
 
     def extrair_texto_txt(arquivo):
-        """Extrai texto de arquivos TXT"""
+        '''Extrai texto de arquivos TXT'''
         try:
             return arquivo.read().decode('utf-8')
         except:
@@ -1377,7 +1377,7 @@ with tab_conteudo:
                 return f"Erro na leitura do TXT: {str(e)}"
 
     def extrair_texto_pptx(arquivo):
-        """Extrai texto de arquivos PowerPoint"""
+        '''Extrai texto de arquivos PowerPoint'''
         try:
             from pptx import Presentation
             import io
@@ -1392,7 +1392,7 @@ with tab_conteudo:
             return f"Erro na leitura do PowerPoint: {str(e)}"
 
     def extrair_texto_docx(arquivo):
-        """Extrai texto de arquivos Word"""
+        '''Extrai texto de arquivos Word'''
         try:
             import docx
             import io
@@ -1462,11 +1462,11 @@ with tab_conteudo:
         # Opção 3: Inserir briefing manualmente
         st.write("✍️ Briefing Manual:")
         briefing_manual = st.text_area("Ou cole o briefing completo aqui:", height=150,
-                                      placeholder="""Exemplo:
+                                      placeholder='''Exemplo:
 Título: Campanha de Lançamento
 Objetivo: Divulgar novo produto
 Público-alvo: Empresários...
-Pontos-chave: [lista os principais pontos]""")
+Pontos-chave: [lista os principais pontos]''')
         
         # Transcrição de áudio/vídeo
         st.write("🎤 Transcrição de Áudio/Video:")
@@ -1522,12 +1522,12 @@ Pontos-chave: [lista os principais pontos]""")
     st.subheader("🎯 Instruções Específicas")
     instrucoes_especificas = st.text_area(
         "Diretrizes adicionais para geração:",
-        placeholder="""Exemplos:
+        placeholder='''Exemplos:
 - Focar nos benefícios para o usuário final
 - Incluir estatísticas quando possível
 - Manter linguagem acessível
 - Evitar jargões técnicos excessivos
-- Seguir estrutura: problema → solução → benefícios""",
+- Seguir estrutura: problema → solução → benefícios''',
         height=100
     )
 
@@ -1568,7 +1568,7 @@ Pontos-chave: [lista os principais pontos]""")
                         contexto_agente = construir_contexto(agente, st.session_state.segmentos_selecionados)
                     
                     # Construir prompt final
-                    prompt_final = f"""
+                    prompt_final = f'''
                     {contexto_agente}
                     
                     ## INSTRUÇÕES PARA GERAÇÃO DE CONTEÚDO:
@@ -1598,7 +1598,7 @@ Pontos-chave: [lista os principais pontos]""")
                     **FORMATO DE SAÍDA:** {formato_saida}
                     
                     Gere um conteúdo completo e profissional.
-                    """
+                    '''
                     
                     resposta = modelo_texto.generate_content(prompt_final)
                     
@@ -1760,7 +1760,7 @@ with tab_blog:
         return []
 
     # ASSINATURA PADRÃO E BOX INICIAL
-    ASSINATURA_PADRAO = """
+    ASSINATURA_PADRAO = '''
 ---
 
 **Sobre o Mais Agro**
@@ -1771,13 +1771,13 @@ O Mais Agro é uma plataforma de conteúdo especializado em agronegócio, trazen
 📱 **Redes sociais:** @maisagrooficial
 
 *Este conteúdo foi desenvolvido pela equipe técnica do Mais Agro para apoiar o produtor rural com informações confiáveis e atualizadas.*
-"""
+'''
 
-    BOX_INICIAL = """
+    BOX_INICIAL = '''
 > 📌 **Destaque do Artigo**
 > 
 > *[Este box deve conter um resumo executivo de 2-3 linhas com os pontos mais importantes do artigo, destacando o problema principal e a solução abordada. Exemplo: "Neste artigo você vai entender como o manejo integrado de nematoides pode aumentar em até 30% a produtividade da soja, com estratégias práticas para implementação imediata."]*
-"""
+'''
 
     # Regras base do sistema - ATUALIZADAS COM CORREÇÕES
     regras_base = '''
