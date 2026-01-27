@@ -3145,7 +3145,7 @@ Victrato pelo Brasil - Soja e Cana - Ação nacional""",
                         6. Praticamente todos os dias com conteúdo
                         7. NUNCA 3 dias consecutivos sem pautas
                         8. Baseie pautas no contexto do mês
-                        9. As pautas devem respeitar COM RIGIDEZ os periodos das culturas descritos no bloco conhecimento_safras
+                        9. As pautas devem respeitar COM RIGIDEZ as fases reais de cada cultura por estados descritos no bloco 'DADOS_SAFRA'
                         
                         FORMATO:
                         - Célula: "[EMOJI] Produto(s) - Cultura(s) - Tema - Breve descrição"
