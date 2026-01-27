@@ -11,7 +11,7 @@ import json
 import hashlib
 from google.genai import types
 import uuid
-from google.cloud import bigquery
+from typing import List, Dict
 import openai
 import pandas as pd
 import csv
@@ -19,40 +19,9 @@ from perplexity import Perplexity
 import openpyxl
 from openpyxl.styles import Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
-from typing import Optional, List, Dict
-from sentence_transformers import SentenceTransformer
-import openai
-
-def get_bigquery_client():
-    """Função auxiliar para obter cliente BigQuery de forma segura"""
-    try:
-        from google.cloud import bigquery
-        from google.oauth2 import service_account
-        import json
-        
-        if 'bigquery_credentials' in st.secrets:
-            # Usar credenciais dos secrets
-            credentials_json = st.secrets['bigquery_credentials']
-            credentials_info = json.loads(credentials_json)
-            credentials = service_account.Credentials.from_service_account_info(credentials_info)
-            
-            client = bigquery.Client(
-                credentials=credentials,
-                project=credentials_info['project_id']
-            )
-            return client
-        else:
-            # Fallback para ADC
-            client = bigquery.Client()
-            return client
-            
-    except Exception as e:
-        st.error(f"❌ Não foi possível criar cliente BigQuery: {str(e)}")
-        return None
-        
 
 # Configure a API key do Perplexity
-perp_api_key = st.secrets["PERP_API_KEY"]
+perp_api_key = os.getenv("PERP_API_KEY")
 if perp_api_key:
     perplexity_client = Perplexity(api_key=perp_api_key)
 else:
@@ -60,272 +29,11 @@ else:
     perplexity_client = None
 
 # Configurações das credenciais
-OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
-ASTRA_DB_API_ENDPOINT = st.secrets.get("ASTRA_DB_API_ENDPOINT", "")
-ASTRA_DB_APPLICATION_TOKEN = st.secrets.get("ASTRA_DB_APPLICATION_TOKEN", "")
-ASTRA_DB_NAMESPACE = st.secrets.get("ASTRA_DB_NAMESPACE", "default_keyspace")
-ASTRA_DB_COLLECTION = st.secrets.get("ASTRA_DB_COLLECTION", "documents")
-GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-
-
-@st.cache_resource
-
-def load_resource_models():
-    """Carrega todos os modelos necessários incluindo BigQuery com credenciais seguras"""
-    
-    # 1. Configurar Gemini
-    try:
-        # Usar API key do secrets ou variável de ambiente
-        gemini_api_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
-        if not gemini_api_key:
-            st.error("❌ GEMINI_API_KEY não encontrada nos secrets ou variáveis de ambiente")
-            st.stop()
-        
-        genai.configure(api_key=gemini_api_key)
-        gemini_model = genai.GenerativeModel('gemini-2.0-flash')
-        print("✅ Gemini model inicializado")
-    except Exception as e:
-        st.error(f"❌ Erro ao configurar Gemini: {str(e)}")
-        gemini_model = None
-    
-    # 2. Modelo para embeddings
-    try:
-        st_model = SentenceTransformer('all-MiniLM-L6-v2')
-        print("✅ SentenceTransformer inicializado")
-    except Exception as e:
-        st.error(f"❌ Erro ao carregar SentenceTransformer: {str(e)}")
-        st_model = None
-    
-    # 3. Inicializar BigQuery usando os secrets do Streamlit
-    bq_client = None
-    try:
-        import json
-        from google.oauth2 import service_account
-        from google.cloud import bigquery
-        
-        # Verificar se temos credenciais nos secrets
-        if 'bigquery_credentials' in st.secrets:
-            # Carregar credenciais como JSON string
-            credentials_json = st.secrets['bigquery_credentials']
-            
-            # Converter string para dicionário
-            credentials_info = json.loads(credentials_json)
-            
-            # Criar credenciais
-            credentials = service_account.Credentials.from_service_account_info(credentials_info)
-            
-            # Inicializar cliente BigQuery
-            bq_client = bigquery.Client(
-                credentials=credentials,
-                project=credentials_info.get('project_id', 'gen-lang-client-0949885382')
-            )
-            
-            print(f"✅ BigQuery inicializado com credenciais do projeto: {credentials.project_id}")
-            
-            # Testar a conexão
-            try:
-                # Query simples para testar
-                test_query = "SELECT 1 as test"
-                test_job = bq_client.query(test_query)
-                test_job.result()  # Aguardar conclusão
-                print("✅ Conexão com BigQuery testada com sucesso")
-            except Exception as test_error:
-                print(f"⚠️ Aviso ao testar BigQuery: {test_error}")
-                # Continuar mesmo com erro de teste
-                
-        else:
-            print("⚠️ bigquery_credentials não encontrado nos secrets, tentando ADC...")
-            try:
-                # Tentar Application Default Credentials
-                bq_client = bigquery.Client()
-                print("✅ BigQuery inicializado com ADC")
-            except Exception as adc_error:
-                print(f"❌ Falha ao usar ADC: {adc_error}")
-                
-    except json.JSONDecodeError as e:
-        st.error(f"❌ Erro ao decodificar JSON das credenciais do BigQuery: {str(e)}")
-    except ImportError as e:
-        st.error(f"❌ Biblioteca do Google Cloud não instalada: {str(e)}")
-        st.info("💡 Execute: pip install google-cloud-bigquery google-auth")
-    except Exception as e:
-        st.error(f"❌ Erro ao inicializar BigQuery: {str(e)}")
-        print(f"Detalhes do erro BigQuery: {type(e).__name__}: {str(e)}")
-    
-    return gemini_model, st_model, bq_client
-
-
-class BigQueryClient:
-    """Classe wrapper para busca vetorial no BigQuery."""
-    def __init__(self, client):
-        self.client = client
-        print("✅ BigQueryClient inicializado para busca vetorial.")
-        
-    def vector_search(self, colecao: str, vector: List[float], limit: int = 10) -> List[Dict]:
-        """Realiza busca por similaridade vetorial na tabela nova."""
-        if not colecao or colecao == "ERRO":
-            return []
-            
-        try:
-            vector_str = str(vector)
-            table_id = "gen-lang-client-0949885382.teste_julia.teste_tabela"
-            
-            query = f"""
-            SELECT 
-                chunk_id,
-                chunk_text,
-                fonte,
-                colecao,
-                ML.DISTANCE(
-                    CAST(embedding AS ARRAY<FLOAT64>), 
-                    CAST({vector_str} AS ARRAY<FLOAT64>), 
-                    'COSINE'
-                ) AS similarity_score
-            FROM `{table_id}`
-            WHERE colecao = '{colecao}'
-            ORDER BY similarity_score ASC
-            LIMIT {limit}
-            """
-            
-            query_job = self.client.query(query)
-            results = query_job.result()
-            
-            documents = []
-            for row in results:
-                doc = {
-                    "chunk_id": row.chunk_id,
-                    "chunk_text": row.chunk_text,
-                    "fonte": row.fonte,
-                    "similarity_score": row.similarity_score
-                }
-                documents.append(doc)
-            return documents
-
-
-        except Exception as e:
-            st.error(f"❌ ERRO na busca BigQuery: {str(e)}")
-            return []
-
-model, st_model, bigquery_client = load_resource_models()
-
-# Verificar se o BigQuery foi inicializado corretamente
-if bigquery_client is None:
-    st.warning("⚠️ Conexão com BigQuery não estabelecida. Algumas funcionalidades estarão limitadas.")
-else:
-    print("✅ Conexão com BigQuery estabelecida com sucesso")
-
-
-
-# -----------------------------------------------------------
-# V. CLASSE LLMClient (Mantida igual)
-# -----------------------------------------------------------
-
-
-class LLMClient:
-    def __init__(self, api_key: str, model: str = "gpt-3.5-turbo"):
-        self.client = openai.OpenAI(api_key=api_key)
-        self.model = model
-
-
-    def generate_content(self, prompt: str) -> str:
-        try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "Você é um agente de revisão técnica altamente preciso."},
-                    {"role": "user", "content": prompt}
-                ]
-            )
-            return response.choices[0].message.content
-        except Exception as e:
-            return f"ERRO NA GERAÇÃO DO LLM: {str(e)}"
-
-
-modelo_texto_openai = LLMClient(api_key=OPENAI_API_KEY)
-
-
-#FUNÇÕES ESPECÍFICAS DESSA ABA DE REVISÃO TÉCNICA 
-def classificar_texto(texto: str) -> Optional[str]:
-    prompt = f"""Analise o texto e classifique-o em: PRODUTO, CULTURA ou OUTROS.
-    Texto: "{texto}"
-    Retorne apenas a palavra em capslook: PRODUTO, CULTURA OU OUTROS."""
-
-
-    try:
-        response = modelo_texto.generate_content(prompt)
-        resposta = response.text.strip().upper()
-        if any(cat in resposta for cat in ["PRODUTO", "CULTURA", "OUTROS"]):
-            return "PRODUTO" if "PRODUTO" in resposta else "CULTURA" if "CULTURA" in resposta else "OUTROS"
-        return "OUTROS"
-    except Exception:
-        return "ERRO"
-
-
-def get_embedding(text: str) -> List[float]:
-    """Usa o SentenceTransformer carregado no cache."""
-    return st_model.encode(text).tolist()
-
-
-# -----------------------------------------------------------
-# VII. FUNÇÕES PRINCIPAIS (RAG e Incremental)
-# -----------------------------------------------------------
-
-
-def reescrever_revisor(content: str, colecao_override: Optional[str] = None) -> str:
-    bq_search_client = BigQueryClient(bigquery_client)
-    # 1. Classificação
-    if colecao_override and colecao_override != "Automática (Classificação Gemini)":
-        colecao = colecao_override
-    else:
-        colecao = classificar_texto(content)
-    
-    if colecao in ["ERRO", None]:
-        return "Erro na classificação da coleção."
-
-
-    # 2. Busca Vetorial
-    embedding = get_embedding(content[:800])
-    relevant_docs = bq_search_client.vector_search(colecao, embedding, limit=5)
-    
-    # 3. Contexto RAG
-    rag_context = ""
-    if relevant_docs:
-        rag_context = "### REFERENCIAL TEÓRICO BUSCADO (BigQuery) ###\n"
-        for i, doc in enumerate(relevant_docs, 1):
-            rag_context += f"--- Fonte: {doc['fonte']} (Similaridade: {doc['similarity_score']:.4f}) ---\n"
-            rag_context += f"{doc['chunk_text']}\n\n"
-    
-    modelo_texto_openai = LLMClient(api_key=OPENAI_API_KEY)
-    
-    # 4. Prompt Final
-    final_prompt = f"""
-    Você é um **Revisor Técnico Sênior** com foco na área agrícola.
-    CORRIGIR imprecisões e ENRIQUECER o texto com os dados do referencial.
-    
-    TEXTO ORIGINAL:
-    {content}
-    
-    {rag_context}
-
-
-    ## ESTRUTURA DE RETORNO:
-    1. TEXTO REVISADO E CORRIGIDO
-    2. 🛠️ Ajustes Técnicos e Correções (lista de alterações e fontes usadas)
-    3. Você deve dizer todas as fontes utilizadas 
-    """
-    
-    return modelo_texto_openai.generate_content(final_prompt)
-
-
-def ajuste_incremental(texto_revisado: str, instrucao_incremental: str) -> str:
-    if not instrucao_incremental: return texto_revisado
-    
-    partes = texto_revisado.split("🛠️ Ajustes Técnicos e Correções")
-    texto_principal = partes[0].strip()
-    
-    prompt = f"Aplique esta mudança: {instrucao_incremental}\n\nTEXTO: {texto_principal}"
-    return modelo_texto.generate_content(prompt)
-
-
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+ASTRA_DB_API_ENDPOINT = os.getenv('ASTRA_DB_API_ENDPOINT')
+ASTRA_DB_APPLICATION_TOKEN = os.getenv('ASTRA_DB_APPLICATION_TOKEN')
+ASTRA_DB_NAMESPACE = os.getenv('ASTRA_DB_NAMESPACE')
+ASTRA_DB_COLLECTION = os.getenv('ASTRA_DB_COLLECTION')
 
 class AstraDBClient:
     def __init__(self):
@@ -356,6 +64,27 @@ class AstraDBClient:
 
 # Inicializa o cliente AstraDB
 astra_client = AstraDBClient()
+
+def get_embedding(text: str) -> List[float]:
+    """Obtém embedding do texto usando OpenAI"""
+    try:
+        client = openai.OpenAI(api_key=OPENAI_API_KEY)
+        response = client.embeddings.create(
+            input=text,
+            model="text-embedding-3-small"
+        )
+        return response.data[0].embedding
+    except Exception as e:
+        st.warning(f"Embedding OpenAI não disponível: {str(e)}")
+        # Fallback para embedding simples
+        import hashlib
+        import numpy as np
+        text_hash = hashlib.md5(text.encode()).hexdigest()
+        vector = [float(int(text_hash[i:i+2], 16) / 255.0) for i in range(0, 32, 2)]
+        # Preenche com valores aleatórios para ter 1536 dimensões
+        while len(vector) < 1536:
+            vector.append(0.0)
+        return vector[:1536]
 
 def reescrever_com_rag_blog(content: str) -> str:
     """REESCREVE conteúdo de blog usando RAG - SAÍDA DIRETA DO CONTEÚDO REESCRITO"""
@@ -596,19 +325,19 @@ if not st.session_state.logged_in:
     login()
     st.stop()
 
+# --- CONEXÃO MONGODB (após login) ---
 client = MongoClient("mongodb+srv://gustavoromao3345:RqWFPNOJQfInAW1N@cluster0.5iilj.mongodb.net/auto_doc?retryWrites=true&w=majority&ssl=true&ssl_cert_reqs=CERT_NONE&tlsAllowInvalidCertificates=true")
 db = client['agentes_personalizados']
 collection_agentes = db['agentes']
 collection_conversas = db['conversas']
 
 # Configuração da API do Gemini
-gemini_api_key = st.secrets["GEMINI_API_KEY"]  # Mude de os.getenv para st.secrets
+gemini_api_key = os.getenv("GEM_API_KEY")
 if not gemini_api_key:
     st.error("GEMINI_API_KEY não encontrada nas variáveis de ambiente")
     st.stop()
 
 genai.configure(api_key=gemini_api_key)
-
 modelo_vision = genai.GenerativeModel("gemini-2.5-flash", generation_config={"temperature": 0.0})
 modelo_texto = genai.GenerativeModel("gemini-2.5-flash")
 modelo_texto2 = genai.GenerativeModel("gemini-2.5-pro")
@@ -2286,53 +2015,644 @@ with tab_revisao_ortografica:
         else:
             st.warning("Por favor, cole um texto para revisão.")
 
-
-# ========== ABA: REVISÃO TÉCNICA (VERSÃO BIGQUERY - COMPLETA) ==========
+# ========== ABA: REVISÃO TÉCNICA (VERSÃO COMPLETA COM RELATÓRIO DE MUDANÇAS) ==========
 with tab_revisao_tecnica:
-
-    st.set_page_config(page_title="Corretor de Texto", layout="wide")
-    st.title("🛠️ Corretor de Texto")
-    st.markdown("**Fluxo Original:** RAG (BigQuery) ➡️ Ajuste Incremental")
-
-    if 'saida_final' not in st.session_state: st.session_state.saida_final = ""
-    if 'ajustes_tecnicos' not in st.session_state: st.session_state.ajustes_tecnicos = ""
-    if 'colecao_usada' not in st.session_state: st.session_state.colecao_usada = ""
-
-    # Interface de Entrada
-    col1, col2 = st.columns(2)
-    with col1:
-        texto_base = st.text_area("Texto Base:", height=250)
-    with col2:
-        colecao_selecionada = st.selectbox("Coleção:", ["Automática (Classificação Gemini)", "PRODUTO", "CULTURA", "OUTROS"])
-        instrucao_inc = st.text_area("Instrução Adicional:", height=150)
-
-    if st.button("Aplicar Correção", type="primary"):
-        with st.spinner("Processando..."):
-            # Passo 1: RAG
-            full_res = reescrever_revisor(texto_base, colecao_selecionada)
-            
-            # Parse do resultado
-            partes = full_res.split("🛠️ Ajustes Técnicos e Correções")
-            st.session_state.saida_final = partes[0].strip()
-            st.session_state.ajustes_tecnicos = partes[1].strip() if len(partes) > 1 else ""
-            
-            # Passo 2: Incremental
-            if instrucao_inc:
-                st.session_state.saida_final = ajuste_incremental(st.session_state.saida_final, instrucao_inc)
-                st.session_state.ajustes_tecnicos += f"\n\n--- Ajuste Incremental: {instrucao_inc}"
-
+    st.header("🔧 Revisão Técnica com RAGs Especializados")
+    st.markdown("**Análise em camadas: taxonomia, epidemiologia, produtos + reescrita final com relatório detalhado**")
+    
+    # Layout com duas colunas principais
+    col_original_rag, col_revisado_rag = st.columns(2)
+    
+    with col_original_rag:
+        st.subheader("📄 Conteúdo Original")
+        texto_tecnico = st.text_area(
+            "Cole o conteúdo técnico para revisão:", 
+            height=300,
+            placeholder="Cole aqui o conteúdo técnico agrícola que precisa ser revisado...",
+            key="texto_tecnico_rag",
+            label_visibility="collapsed"
+        )
+    
+    with col_revisado_rag:
+        st.subheader("✨ Conteúdo Revisado com RAG")
+        # Placeholder para o conteúdo revisado com RAG
+        revisado_rag_placeholder = st.empty()
+        revisado_rag_placeholder.info("📝 Aguardando revisão com RAG... O conteúdo revisado aparecerá aqui.")
+    
+    # Configurações da revisão (abaixo das colunas)
     st.markdown("---")
-    st.header("Resultado Final")
-    st.text_area("Texto Corrigido:", value=st.session_state.saida_final, height=400)
-    st.subheader("🛠️ Detalhes")
-    st.code(st.session_state.ajustes_tecnicos)
+    st.subheader("⚙️ Configurações da Revisão")
+    
+    col_config1, col_config2, col_config3 = st.columns([2, 1, 1])
+    
+    with col_config1:
+        # Tipo de conteúdo específico
+        tipo_conteudo = st.selectbox(
+            "Tipo de Conteúdo:",
+            ["Artigo Técnico", "Material Comercial", "Blog Post", "Manual Técnico", "Comunicado Técnico"],
+            help="Define o rigor da revisão"
+        )
+    
+    with col_config2:
+        st.subheader("🔍 RAGs Especializados")
+        
+        rag_taxonomia = st.checkbox("RAG Taxonomia", value=True, 
+                                  help="Busca específica por classificação de patógenos")
+        rag_epidemiologia = st.checkbox("RAG Epidemiologia", value=True,
+                                      help="Busca específica por condições ambientais")
+        rag_produtos = st.checkbox("RAG Produtos", value=True,
+                                 help="Busca específica por informações de produtos")
+        rag_geral = st.checkbox("RAG Geral", value=True,
+                              help="Busca geral por similaridade semântica")
+    
+    with col_config3:
+        st.subheader("⚙️ Configurações")
+        
+        nivel_rigor = st.select_slider(
+            "Nível de Rigor:",
+            ["Leve", "Moderado", "Rigoroso", "Especialista"]
+        )
+        
+        limite_documentos = st.number_input("Docs por RAG", min_value=3, max_value=20, value=12,
+                                          help="Número de documentos resgatados por RAG especializado")
+        
+        usar_contexto_agente = st.checkbox("Usar contexto do agente", 
+                                         value=bool(st.session_state.agente_selecionado))
+        
+        # NOVA OPÇÃO: Incluir relatório detalhado
+        incluir_relatorio = st.checkbox("📋 Incluir relatório de mudanças", value=True,
+                                      help="Gera um relatório detalhado mostrando todas as alterações")
 
+    # Funções para RAGs especializados (mantidas iguais)
+    def realizar_rag_taxonomia(texto: str, limite: int = 12) -> List[Dict]:
+        """RAG especializado em taxonomia e classificação de patógenos"""
+        perguntas_especificas = [
+            "classificação taxonômica",
+            "fungo ou oomiceto",
+            "nome científico patógeno", 
+            "reino filo classe ordem",
+            "agente causal doença",
+            "Peronospora Phakopsora Corynespora",
+            "oomiceto vs fungo diferença",
+            "taxonomia fitopatologia"
+        ]
+        
+        documentos_combinados = []
+        for pergunta in perguntas_especificas:
+            query = f"{texto[:200]} {pergunta}"
+            embedding = get_embedding(query)
+            documentos = astra_client.vector_search(ASTRA_DB_COLLECTION, embedding, limit=limite//len(perguntas_especificas))
+            documentos_combinados.extend(documentos)
+        
+        # Remover duplicados
+        documentos_unicos = []
+        ids_vistos = set()
+        for doc in documentos_combinados:
+            doc_id = str(doc.get('_id', ''))
+            if doc_id not in ids_vistos:
+                documentos_unicos.append(doc)
+                ids_vistos.add(doc_id)
+        
+        return documentos_unicos[:limite]
+
+    def realizar_rag_epidemiologia(texto: str, limite: int = 12) -> List[Dict]:
+        """RAG especializado em condições epidemiológicas"""
+        perguntas_especificas = [
+            "condições ambientais doença",
+            "temperatura umidade molhamento foliar",
+            "condições ideais infecção",
+            "epidemiologia doença plantas",
+            "período molhamento temperatura ótima",
+            "umidade relativa infecção",
+            "condições climáticas favoráveis",
+            "fatores epidemiológicos"
+        ]
+        
+        documentos_combinados = []
+        for pergunta in perguntas_especificas:
+            query = f"{texto[:200]} {pergunta}"
+            embedding = get_embedding(query)
+            documentos = astra_client.vector_search(ASTRA_DB_COLLECTION, embedding, limit=limite//len(perguntas_especificas))
+            documentos_combinados.extend(documentos)
+        
+        # Remover duplicados
+        documentos_unicos = []
+        ids_vistos = set()
+        for doc in documentos_combinados:
+            doc_id = str(doc.get('_id', ''))
+            if doc_id not in ids_vistos:
+                documentos_unicos.append(doc)
+                ids_vistos.add(doc_id)
+        
+        return documentos_unicos[:limite]
+
+    def realizar_rag_produtos(texto: str, limite: int = 12) -> List[Dict]:
+        """RAG especializado em informações de produtos"""
+        perguntas_especificas = [
+            "modo de ação produto",
+            "aplicação dose recomendada",
+            "eficácia controle doença",
+            "características técnicas produto",
+            "benefícios produto agrícola",
+            "tecnologia aplicação",
+            "resultados eficácia",
+            "recomendações uso produto"
+        ]
+        
+        documentos_combinados = []
+        for pergunta in perguntas_especificas:
+            query = f"{texto[:200]} {pergunta}"
+            embedding = get_embedding(query)
+            documentos = astra_client.vector_search(ASTRA_DB_COLLECTION, embedding, limit=limite//len(perguntas_especificas))
+            documentos_combinados.extend(documentos)
+        
+        # Remover duplicados
+        documentos_unicos = []
+        ids_vistos = set()
+        for doc in documentos_combinados:
+            doc_id = str(doc.get('_id', ''))
+            if doc_id not in ids_vistos:
+                documentos_unicos.append(doc)
+                ids_vistos.add(doc_id)
+        
+        return documentos_unicos[:limite]
+
+    def realizar_rag_geral(texto: str, limite: int = 12) -> List[Dict]:
+        """RAG geral por similaridade semântica"""
+        embedding = get_embedding(texto[:800])
+        documentos = astra_client.vector_search(ASTRA_DB_COLLECTION, embedding, limit=limite)
+        return documentos
+
+    def processar_rags_especializados(texto: str, rags_ativos: dict, limite: int = 12) -> dict:
+        """Executa todos os RAGs especializados e retorna resultados consolidados"""
+        resultados = {}
+        
+        if rags_ativos.get('taxonomia'):
+            with st.spinner("🔬 Buscando informações de taxonomia..."):
+                resultados['taxonomia'] = realizar_rag_taxonomia(texto, limite)
+        
+        if rags_ativos.get('epidemiologia'):
+            with st.spinner("🌡️ Buscando informações epidemiológicas..."):
+                resultados['epidemiologia'] = realizar_rag_epidemiologia(texto, limite)
+        
+        if rags_ativos.get('produtos'):
+            with st.spinner("🧪 Buscando informações de produtos..."):
+                resultados['produtos'] = realizar_rag_produtos(texto, limite)
+        
+        if rags_ativos.get('geral'):
+            with st.spinner("📚 Buscando informações gerais..."):
+                resultados['geral'] = realizar_rag_geral(texto, limite)
+        
+        return resultados
+
+    # NOVA FUNÇÃO: Reescrita com relatório detalhado de mudanças
+    def reescrever_com_relatorio_mudancas(texto_original: str, resultados_rags: dict, contexto_agente: str = "") -> tuple:
+        """Reescreve o conteúdo e gera um relatório detalhado das mudanças"""
+        
+        # Construir contexto consolidado dos RAGs
+        contexto_rags = "## DOCUMENTOS TÉCNICOS DE REFERÊNCIA:\n\n"
+        
+        for categoria, documentos in resultados_rags.items():
+            if documentos:
+                contexto_rags += f"### {categoria.upper()} ({len(documentos)} documentos):\n"
+                for i, doc in enumerate(documentos, 1):
+                    doc_content = str(doc)
+                    doc_limpo = doc_content.replace('{', '').replace('}', '').replace("'", "").replace('"', '')
+                    if len(doc_limpo) > 300:
+                        doc_limpo = doc_limpo[:300] + "..."
+                    contexto_rags += f"- {doc_limpo}\n"
+                contexto_rags += "\n"
+
+        # Prompt para reescrita COM relatório
+        prompt_reescrita = f"""
+        {contexto_agente}
+
+        ## TEXTO ORIGINAL PARA REESCRITA:
+        {texto_original}
+
+        ## BASE TÉCNICA DE REFERÊNCIA:
+        {contexto_rags}
+
+        ## INSTRUÇÕES CRÍTICAS:
+
+        **SUA TAREFA:** 
+        1. Reescrever o texto original aplicando correções técnicas baseadas nos documentos de referência
+        2. Gerar um relatório DETALHADO de TODAS as mudanças realizadas
+
+        **FORMATO DE SAÍDA EXIGIDO (use exatamente esta estrutura):**
+
+        ### 📝 TEXTO REESCRITO
+        [AQUI VOCÊ COLA O TEXTO COMPLETO REESCRITO E CORRIGIDO]
+
+        ### 🔍 RELATÓRIO DETALHADO DE MUDANÇAS
+
+        #### 📊 RESUMO EXECUTIVO
+        - Total de correções aplicadas: [N]
+        - Principais categorias de ajustes: [lista categorias]
+        - Impacto na precisão técnica: [Alto/Médio/Baixo]
+
+        #### 📋 MUDANÇAS DETALHADAS
+
+        **1. CORREÇÕES TAXONÔMICAS:**
+        [Lista cada correção taxonômica no formato:
+        - **Original:** "texto original"
+        - **Corrigido:** "texto corrigido" 
+        - **Justificativa:** explicação técnica baseada nos documentos]
+
+        **2. PRECISÃO EPIDEMIOLÓGICA:**
+        [Lista cada correção epidemiológica no formato:
+        - **Original:** "texto original"
+        - **Corrigido:** "texto corrigido"
+        - **Justificativa:** explicação com base científica]
+
+        **3. INFORMAÇÕES DE PRODUTOS:**
+        [Lista cada correção de produtos no formato:
+        - **Original:** "texto original" 
+        - **Corrigido:** "texto corrigido"
+        - **Justificativa:** ajuste técnico necessário]
+
+        **4. TERMINOLOGIA TÉCNICA:**
+        [Lista cada ajuste de terminologia no formato:
+        - **Original:** "termo vago/impreciso"
+        - **Corrigido:** "termo técnico preciso"
+        - **Justificativa:** padronização técnica]
+
+        **5. DADOS E ESTATÍSTICAS:**
+        [Lista cada correção de dados no formato:
+        - **Original:** "dado impreciso"
+        - **Corrigido:** "dado corrigido"
+        - **Justificativa:** fonte/documento de referência]
+
+        #### 🎯 IMPACTO DAS CORREÇÕES
+        - Melhorias na precisão científica: [lista específica]
+        - Ajustes na comunicação técnica: [lista específica]
+        - Correções de segurança da informação: [lista específica]
+
+        **CORREÇÕES TÉCNICAS OBRIGATÓRIAS:**
+
+        1. **PRECISÃO TAXONÔMICA:**
+           - Corrigir "fungo" para "oomiceto" quando aplicável
+           - Validar nomes científicos e classificação
+           - Ajustar descrições de ciclo de vida
+
+        2. **ESPECIFICIDADE EPIDEMIOLÓGICA:**
+           - Substituir termos vagos por faixas específicas
+           - Especificar temperaturas exatas
+           - Definir períodos de molhamento foliar
+           - Vincular condições ao fechamento do dossel
+
+        3. **DESCRIÇÃO PRECISA DE SINTOMAS:**
+           - Corrigir descrições imprecisas
+           - Especificar localização nas plantas
+           - Detalhar evolução dos sintomas
+           - Ajustar terminologia técnica
+
+        4. **MANEJO E TIMING:**
+           - Alinhar mensagens sobre timing de aplicação
+           - Esclarecer momentos diferentes
+           - Especificar rotação de MoA
+
+        5. **INFORMAÇÕES DE PRODUTOS:**
+           - Corrigir claims imprecisos
+           - Especificar "conforme bula" quando necessário
+           - Validar números de eficácia
+           - Ajustar claims técnicos com precisão
+
+        **REGRAS ADICIONAIS:**
+        - Mantenha a estrutura e formatação do original
+        - Preserve títulos, subtítulos e marcações
+        - Apenas corrija o conteúdo técnico, não reinvente a estrutura
+        - Se não houver informações nos RAGs para corrigir algo específico, mantenha o original
+        - Para CADA mudança, forneça justificativa técnica específica
+
+        **RETORNE EXATAMENTE no formato especificado acima.**
+        """
+
+        try:
+            resposta = modelo_texto.generate_content(prompt_reescrita)
+            texto_completo = resposta.text
+            
+            # Separar o texto reescrito do relatório
+            if "### 📝 TEXTO REESCRITO" in texto_completo and "### 🔍 RELATÓRIO DETALHADO DE MUDANÇAS" in texto_completo:
+                partes = texto_completo.split("### 🔍 RELATÓRIO DETALHADO DE MUDANÇAS")
+                texto_reescrito = partes[0].replace("### 📝 TEXTO REESCRITO", "").strip()
+                relatorio_mudancas = "### 🔍 RELATÓRIO DETALHADO DE MUDANÇAS" + partes[1]
+            else:
+                # Fallback se o formato não for seguido
+                texto_reescrito = texto_completo
+                relatorio_mudancas = "### ❌ Relatório não gerado automaticamente\nO modelo não seguiu o formato solicitado para o relatório."
+            
+            return texto_reescrito, relatorio_mudancas
+            
+        except Exception as e:
+            st.error(f"Erro na reescrita: {str(e)}")
+            return texto_original, f"### ❌ Erro na geração do relatório\n{str(e)}"
+
+    def reescrever_sem_relatorio(texto_original: str, resultados_rags: dict, contexto_agente: str = "") -> str:
+        """Reescreve o conteúdo sem gerar relatório (para opção rápida)"""
+        
+        contexto_rags = "## DOCUMENTOS TÉCNICOS DE REFERÊNCIA:\n\n"
+        
+        for categoria, documentos in resultados_rags.items():
+            if documentos:
+                contexto_rags += f"### {categoria.upper()} ({len(documentos)} documentos):\n"
+                for i, doc in enumerate(documentos, 1):
+                    doc_content = str(doc)
+                    doc_limpo = doc_content.replace('{', '').replace('}', '').replace("'", "").replace('"', '')
+                    if len(doc_limpo) > 300:
+                        doc_limpo = doc_limpo[:300] + "..."
+                    contexto_rags += f"- {doc_limpo}\n"
+                contexto_rags += "\n"
+
+        prompt_rapido = f"""
+        {contexto_agente}
+
+        ## TEXTO ORIGINAL PARA REESCRITA:
+        {texto_original}
+
+        ## BASE TÉCNICA DE REFERÊNCIA:
+        {contexto_rags}
+
+        **REESCREVA o texto aplicando correções técnicas baseadas nos documentos.**
+        **RETORNE APENAS o texto reescrito, sem comentários ou relatórios.**
+
+        Correções obrigatórias:
+        - Precisão taxonômica (fungo vs oomiceto)
+        - Especificidade epidemiológica (temperaturas, umidades)
+        - Informações precisas de produtos
+        - Terminologia técnica adequada
+
+        Mantenha a estrutura original.
+        """
+
+        resposta = modelo_texto.generate_content(prompt_rapido)
+        return resposta.text.strip()
+
+    # Botão de revisão técnica com RAGs especializados - AGORA CENTRALIZADO
+    st.markdown("---")
+    col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
+    
+    with col_btn2:
+        if st.button("🔬 Realizar Revisão com RAGs Especializados", type="primary", use_container_width=True):
+            if texto_tecnico:
+                # Configurar RAGs ativos
+                rags_ativos = {
+                    'taxonomia': rag_taxonomia,
+                    'epidemiologia': rag_epidemiologia, 
+                    'produtos': rag_produtos,
+                    'geral': rag_geral
+                }
+                
+                # Construir contexto do agente se solicitado
+                contexto_agente = ""
+                if usar_contexto_agente and st.session_state.agente_selecionado:
+                    agente = st.session_state.agente_selecionado
+                    contexto_agente = construir_contexto(agente, st.session_state.segmentos_selecionados)
+                
+                with st.spinner("🚀 Executando pipeline de RAGs especializados..."):
+                    try:
+                        # FASE 1: Executar RAGs especializados
+                        st.subheader("📡 Fase 1: Busca com RAGs Especializados")
+                        
+                        resultados_rags = processar_rags_especializados(texto_tecnico, rags_ativos, limite_documentos)
+                        
+                        # Mostrar estatísticas dos RAGs
+                        col_rag1, col_rag2, col_rag3, col_rag4 = st.columns(4)
+                        with col_rag1:
+                            st.metric("RAG Taxonomia", 
+                                     len(resultados_rags.get('taxonomia', [])),
+                                     help="Documentos sobre classificação de patógenos")
+                        with col_rag2:
+                            st.metric("RAG Epidemiologia", 
+                                     len(resultados_rags.get('epidemiologia', [])),
+                                     help="Documentos sobre condições ambientais")
+                        with col_rag3:
+                            st.metric("RAG Produtos", 
+                                     len(resultados_rags.get('produtos', [])),
+                                     help="Documentos sobre produtos e eficácia")
+                        with col_rag4:
+                            st.metric("RAG Geral", 
+                                     len(resultados_rags.get('geral', [])),
+                                     help="Documentos por similaridade semântica")
+                        
+                        # FASE 2: Reescrita com LLM
+                        st.subheader("✍️ Fase 2: Reescrita com Base nos RAGs")
+                        
+                        with st.spinner("Reescrevendo conteúdo e gerando relatório de mudanças..."):
+                            # Escolher qual função de reescrita usar baseado na configuração
+                            if incluir_relatorio:
+                                texto_reescrito, relatorio_mudancas = reescrever_com_relatorio_mudancas(
+                                    texto_tecnico, resultados_rags, contexto_agente
+                                )
+                            else:
+                                texto_reescrito = reescrever_sem_relatorio(texto_tecnico, resultados_rags, contexto_agente)
+                                relatorio_mudancas = None
+                        
+                        # FASE 3: Atualizar visualização lado a lado
+                        st.subheader("📋 Fase 3: Resultados da Revisão")
+                        
+                        # Atualizar a coluna direita com o conteúdo revisado
+                        with col_revisado_rag:
+                            revisado_rag_placeholder.empty()
+                            st.success("✅ Conteúdo revisado com RAGs!")
+                            
+                            # Criar abas para organizar o conteúdo revisado
+                            if incluir_relatorio and relatorio_mudancas:
+                                tab_texto_reescrito, tab_relatorio_mudancas, tab_analise = st.tabs([
+                                    "📝 Texto Reescrito", "📋 Relatório de Mudanças", "📊 Análise RAGs"
+                                ])
+                                
+                                with tab_texto_reescrito:
+                                    st.text_area(
+                                        "Texto reescrito com base nos RAGs:",
+                                        texto_reescrito,
+                                        height=300,
+                                        label_visibility="collapsed"
+                                    )
+                                
+                                with tab_relatorio_mudancas:
+                                    st.markdown(relatorio_mudancas)
+                                
+                                with tab_analise:
+                                    # Estatísticas de comparação
+                                    palavras_orig = len(texto_tecnico.split())
+                                    palavras_reesc = len(texto_reescrito.split())
+                                    diff_palavras = palavras_reesc - palavras_orig
+                                    
+                                    col_stat1, col_stat2, col_stat3 = st.columns(3)
+                                    with col_stat1:
+                                        st.metric("Palavras Original", palavras_orig)
+                                    with col_stat2:
+                                        st.metric("Palavras Reescrito", palavras_reesc)
+                                    with col_stat3:
+                                        st.metric("Diferença", 
+                                                 f"{'+' if diff_palavras > 0 else ''}{diff_palavras}",
+                                                 delta=f"{diff_palavras/palavras_orig*100:.1f}%" if palavras_orig > 0 else "0%")
+                                    
+                                    # Estatísticas dos RAGs
+                                    st.markdown("### 📊 Estatísticas dos RAGs")
+                                    for categoria, documentos in resultados_rags.items():
+                                        if documentos:
+                                            st.write(f"**{categoria.capitalize()}:** {len(documentos)} documentos encontrados")
+                            else:
+                                # Sem relatório - apenas mostrar texto reescrito
+                                st.text_area(
+                                    "Texto reescrito com base nos RAGs:",
+                                    texto_reescrito,
+                                    height=300,
+                                    label_visibility="collapsed"
+                                )
+                        
+                        # Botões de download
+                        st.markdown("---")
+                        col_dl1, col_dl2, col_dl3 = st.columns(3)
+                        
+                        with col_dl1:
+                            st.download_button(
+                                "💾 Baixar Texto Reescrito",
+                                data=texto_reescrito,
+                                file_name=f"texto_reescrito_rags_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                                mime="text/plain",
+                                use_container_width=True
+                            )
+                        
+                        with col_dl2:
+                            if incluir_relatorio and relatorio_mudancas:
+                                st.download_button(
+                                    "💾 Baixar Relatório",
+                                    data=relatorio_mudancas,
+                                    file_name=f"relatorio_mudancas_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.md",
+                                    mime="text/markdown",
+                                    use_container_width=True
+                                )
+                        
+                        with col_dl3:
+                            # Pacote completo
+                            pacote_completo = f"TEXTO ORIGINAL:\n{texto_tecnico}\n\n"
+                            pacote_completo += "="*60 + "\n\n"
+                            pacote_completo += f"TEXTO REESCRITO COM RAGs:\n{texto_reescrito}\n\n"
+                            if incluir_relatorio and relatorio_mudancas:
+                                pacote_completo += "="*60 + "\n\n"
+                                pacote_completo += f"RELATÓRIO DE MUDANÇAS:\n{relatorio_mudancas}"
+                            
+                            st.download_button(
+                                "📦 Baixar Pacote Completo",
+                                data=pacote_completo,
+                                file_name=f"revisao_completa_rags_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                                mime="text/plain",
+                                use_container_width=True
+                            )
+                        
+                        # Salvar no histórico se MongoDB disponível
+                        if mongo_connected_blog:
+                            try:
+                                revisao_data = {
+                                    "texto_original": texto_tecnico,
+                                    "texto_reescrito": texto_reescrito,
+                                    "relatorio_mudancas": relatorio_mudancas if incluir_relatorio else "Não gerado",
+                                    "rags_utilizados": rags_ativos,
+                                    "documentos_encontrados": {k: len(v) for k, v in resultados_rags.items()},
+                                    "nivel_rigor": nivel_rigor,
+                                    "incluiu_relatorio": incluir_relatorio,
+                                    "data_criacao": datetime.datetime.now()
+                                }
+                                if 'revisoes_rags' not in db.list_collection_names():
+                                    db.create_collection('revisoes_rags')
+                                db['revisoes_rags'].insert_one(revisao_data)
+                                st.success("✅ Revisão salva no histórico!")
+                            except Exception as e:
+                                st.warning(f"Revisão concluída, mas não salva: {str(e)}")
+                    
+                    except Exception as e:
+                        st.error(f"❌ Erro no pipeline de RAGs: {str(e)}")
+                        with col_revisado_rag:
+                            revisado_rag_placeholder.error(f"❌ Erro: {str(e)}")
+            else:
+                st.warning("Por favor, cole um conteúdo técnico para revisão.")
+
+    # Ferramentas avançadas para análise (mantidas iguais)
+    if 'ultima_revisao' in st.session_state and 'ultima_revisao' in locals():
+        st.markdown("---")
+        st.subheader("🔄 Ajustes Incrementais para RAGs")
+        
+        st.info("Use o campo abaixo para solicitar ajustes específicos na última revisão com RAGs.")
+        
+        # Caixa de texto para comandos de ajuste específico para RAGs
+        comando_ajuste_rag = st.text_area(
+            "Comandos para ajustar a revisão RAG:",
+            height=150,
+            placeholder="Exemplos:\n- Aumente o foco na taxonomia dos patógenos\n- Inclua mais informações epidemiológicas\n- Corrija dados específicos de produtos\n- Adicione referências da base técnica",
+            key="comando_ajuste_rag"
+        )
+        
+        # Botão para ajustar a revisão RAG
+        if st.button("🔄 Ajustar Revisão RAG", type="secondary", use_container_width=True):
+            if comando_ajuste_rag and 'texto_reescrito' in locals():
+                with st.spinner("🔄 Aplicando ajustes na revisão RAG..."):
+                    try:
+                        # Prompt para ajuste da revisão RAG
+                        prompt_ajuste_rag = f"""
+                        VOCÊ É: Um especialista técnico agrícola.
+
+                        SUA TAREFA: Ajustar a revisão técnica anterior com base nas solicitações específicas.
+
+                        TEXTO ORIGINAL:
+                        {texto_tecnico}
+
+                        TEXTO REESCRITO COM RAGs:
+                        {texto_reescrito}
+
+                        RELATÓRIO DE MUDANÇAS:
+                        {relatorio_mudancas if 'relatorio_mudancas' in locals() and relatorio_mudancas else "Nenhum relatório disponível"}
+
+                        SOLICITAÇÕES DE AJUSTE:
+                        {comando_ajuste_rag}
+
+                        INSTRUÇÕES:
+                        1. Aplique TODOS os ajustes solicitados
+                        2. Mantenha a precisão técnica
+                        3. Considere as informações dos RAGs utilizados
+                        4. Retorne o texto reescrito ajustado
+                        5. Se solicitado, atualize também o relatório de mudanças
+
+                        Retorne o texto reescrito ajustado.
+                        """
+
+                        resposta_ajuste_rag = modelo_texto2.generate_content(prompt_ajuste_rag)
+                        texto_reescrito_ajustado = resposta_ajuste_rag.text
+                        
+                        # Atualizar a visualização
+                        with col_revisado_rag:
+                            revisado_rag_placeholder.empty()
+                            st.success("✅ Revisão RAG ajustada!")
+                            st.text_area(
+                                "Texto reescrito ajustado:",
+                                texto_reescrito_ajustado,
+                                height=300,
+                                label_visibility="collapsed"
+                            )
+                        
+                        # Botão para baixar versão ajustada
+                        st.download_button(
+                            "💾 Baixar Versão Ajustada",
+                            data=texto_reescrito_ajustado,
+                            file_name=f"revisao_rag_ajustada_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                            mime="text/plain",
+                            use_container_width=True
+                        )
+                    
+                    except Exception as e:
+                        st.error(f"❌ Erro ao ajustar revisão RAG: {str(e)}")
+
+# O resto do código permanece igual...
 
 
 # --- FUNÇÃO ATUALIZADA PARA BUSCA WEB COM PERPLEXITY ---
 def buscar_perplexity(prompt: str) -> str:
     """Realiza busca na web usando a biblioteca Perplexity"""
     try:
+        if not perplexity_available or perplexity_client is None:
+            return "❌ Cliente Perplexity não disponível"
         
         # Enviar prompt para o Perplexity
         response = perplexity_client.chat.completions.create(
@@ -2357,6 +2677,9 @@ def buscar_perplexity(prompt: str) -> str:
 # --- FUNÇÃO ESPECÍFICA PARA OTIMIZAÇÃO DE CONTEÚDO ---
 def buscar_fontes_para_otimizacao(conteudo: str, tipo: str, tom: str) -> str:
     """Busca fontes específicas para otimização de conteúdo agrícola"""
+    if not perplexity_available:
+        return "Busca web desativada"
+    
     prompt = f"""
     
    
@@ -2427,7 +2750,7 @@ with tab_otimizacao:
             from perplexity import Perplexity
             
             # Obter API key
-            perp_api_key = st.secrets.get("PERP_API_KEY")
+            perp_api_key = os.getenv("PERP_API_KEY")
             if not perp_api_key:
                 return "❌ ERRO: PERP_API_KEY não encontrada nas variáveis de ambiente"
             
@@ -2973,156 +3296,8 @@ Victrato pelo Brasil - Soja e Cana - Ação nacional""",
                            - Células podem ter múltiplas culturas/produtos
                         """
                         
-
-                        info_algodao = """
-                        Tocantins: Plantio de novembro (2ª quinzena) até fevereiro (2ª quinzena), com pico intenso em janeiro. Colheita de abril (2ª quinzena) até agosto (1ª quinzena), com pico intenso em junho e julho.
-                        Maranhão: Plantio de dezembro (1ª quinzena) até março (2ª quinzena), com pico intenso em janeiro. Colheita de maio (2ª quinzena) até agosto (2ª quinzena), com pico intenso em junho e julho.
-                        Piauí: Plantio de dezembro (2ª quinzena) até março (2ª quinzena), com pico intenso em janeiro. Colheita de maio (2ª quinzena) até agosto (1ª quinzena), com pico intenso em junho e julho.
-                        Ceará: Plantio de janeiro (1ª quinzena) até maio (1ª quinzena), com pico intenso em fevereiro e março. Colheita de junho (1ª quinzena) até outubro (2ª quinzena), com pico intenso em junho, julho e agosto.
-                        Rio Grande do Norte: Plantio de janeiro (1ª quinzena) até abril (2ª quinzena), com pico intenso em fevereiro e março. Colheita de julho (1ª quinzena) até novembro (2ª quinzena), com pico intenso em agosto e setembro.
-                        Paraíba: Plantio de fevereiro (1ª quinzena) até maio (1ª quinzena), com pico intenso em março. Colheita de agosto (1ª quinzena) até novembro (2ª quinzena), com pico intenso em agosto e setembro.
-                        Pernambuco: Plantio de janeiro (1ª quinzena) até junho (2ª quinzena), com pico intenso em março. Colheita de agosto (1ª quinzena) até dezembro (1ª quinzena), com pico intenso em agosto e setembro.
-                        Alagoas: Plantio de maio (2ª quinzena) até agosto (2ª quinzena), com pico intenso em junho. Colheita de outubro (2ª quinzena) até janeiro (2ª quinzena), com pico intenso em novembro e dezembro.
-                        Bahia: Plantio de novembro (2ª quinzena) até fevereiro (1ª quinzena), com pico intenso em dezembro. Colheita de abril (2ª quinzena) até setembro (1ª quinzena), com pico intenso em maio e junho.
-                        Mato Grosso: Plantio de dezembro (1ª quinzena) até fevereiro (2ª quinzena), com pico intenso em janeiro. Colheita de abril (2ª quinzena) até agosto (2ª quinzena), com pico intenso em junho.
-                        Mato Grosso do Sul: Plantio de outubro (1ª quinzena) até janeiro (1ª quinzena), com pico intenso em novembro e dezembro. Colheita de março (2ª quinzena) até junho (1ª quinzena), com pico intenso em abril.
-                        Goiás: Plantio de outubro (2ª quinzena) até janeiro (1ª quinzena), com pico intenso em novembro e dezembro. Colheita de março (2ª quinzena) até junho (2ª quinzena), com pico intenso em maio.
-                        Distrito Federal: Plantio de outubro (2ª quinzena) até janeiro (1ª quinzena), com pico intenso em novembro e dezembro. Colheita de abril (1ª quinzena) até junho (2ª quinzena), com pico intenso em maio.
-                        Minas Gerais: Plantio de outubro (1ª quinzena) até janeiro (1ª quinzena), com pico intenso em novembro e dezembro. Colheita de março (2ª quinzena) até junho (1ª quinzena), com pico intenso em abril e maio.
-                        São Paulo: Plantio de outubro (1ª quinzena) até janeiro (1ª quinzena), com pico intenso em novembro e dezembro. Colheita de março (1ª quinzena) até junho (1ª quinzena), com pico intenso em abril e maio.
-                        Paraná: Plantio de setembro (2ª quinzena) até dezembro (1ª quinzena), com pico intenso em outubro e novembro. Colheita de março (1ª quinzena) até maio (2ª quinzena), com pico intenso em abril.
-                        """
-                        
-                        info_arroz = """
-                        Roraima: Plantio de maio (1ª quinzena) até agosto (2ª quinzena), com pico intenso em maio. Colheita de julho (2ª quinzena) até novembro (2ª quinzena), com pico intenso em setembro.
-                        Rondônia: Plantio de setembro (2ª quinzena) até janeiro (1ª quinzena), com pico intenso em novembro e dezembro. Colheita de janeiro (1ª quinzena) até maio (1ª quinzena), com pico intenso em fevereiro e março.
-                        Acre: Plantio de setembro (2ª quinzena) até janeiro (1ª quinzena), com pico intenso em novembro e dezembro. Colheita de janeiro (1ª quinzena) até maio (1ª quinzena), com pico intenso em fevereiro e março.
-                        Amazonas: Plantio de setembro (2ª quinzena) até janeiro (1ª quinzena), com pico intenso em novembro e dezembro. Colheita de janeiro (2ª quinzena) até maio (1ª quinzena), com pico intenso em março.
-                        Amapá: Plantio de janeiro (1ª quinzena) até abril (1ª quinzena), com pico intenso em fevereiro. Colheita de maio (2ª quinzena) até agosto (2ª quinzena), com pico intenso em junho.
-                        Pará: Plantio de dezembro (1ª quinzena) até abril (2ª quinzena), com pico intenso em janeiro. Colheita de abril (1ª quinzena) até agosto (2ª quinzena), com pico intenso em abril e maio.
-                        Tocantins: Plantio de outubro (2ª quinzena) até janeiro (2ª quinzena), com pico intenso em novembro e dezembro. Colheita de fevereiro (1ª quinzena) até maio (1ª quinzena), com pico intenso em março e abril.
-                        Maranhão: Plantio de novembro (1ª quinzena) até março (1ª quinzena), com pico intenso em janeiro. Colheita de abril (1ª quinzena) até julho (1ª quinzena), com pico intenso em abril e maio.
-                        Piauí: Plantio de novembro (1ª quinzena) até março (1ª quinzena), com pico intenso em janeiro. Colheita de abril (1ª quinzena) até julho (1ª quinzena), com pico intenso em abril e maio.
-                        Ceará: Plantio de janeiro (1ª quinzena) até abril (2ª quinzena), com pico intenso em janeiro e fevereiro. Colheita de maio (1ª quinzena) até julho (1ª quinzena), com pico intenso em maio e junho.
-                        Rio Grande do Norte: Plantio de janeiro (2ª quinzena) até maio (1ª quinzena), com pico intenso em março. Colheita de junho (1ª quinzena) até outubro (1ª quinzena), com pico intenso em agosto.
-                        Paraíba: Plantio de janeiro (1ª quinzena) até abril (1ª quinzena), com pico intenso em janeiro e fevereiro. Colheita de maio (2ª quinzena) até agosto (1ª quinzena), com pico intenso em junho.
-                        Pernambuco: Plantio de janeiro (1ª quinzena) até abril (1ª quinzena), com pico intenso em fevereiro. Colheita de maio (1ª quinzena) até agosto (1ª quinzena), com pico intenso em junho.
-                        Alagoas: Plantio de setembro (2ª quinzena) até dezembro (1ª quinzena), com pico intenso em outubro e novembro. Colheita de janeiro (1ª quinzena) até março (2ª quinzena), com pico intenso em fevereiro e março.
-                        Sergipe: Plantio de setembro (2ª quinzena) até novembro (2ª quinzena), com pico intenso em outubro. Colheita de janeiro (1ª quinzena) até março (2ª quinzena), com pico intenso em fevereiro.
-                        Bahia: Plantio de setembro (2ª quinzena) até dezembro (1ª quinzena), com pico intenso em outubro e novembro. Colheita de janeiro (1ª quinzena) até abril (1ª quinzena), com pico intenso em fevereiro e março.
-                        Mato Grosso: Plantio de setembro (1ª quinzena) até janeiro (1ª quinzena), com pico intenso em novembro e dezembro. Colheita de janeiro (1ª quinzena) até maio (1ª quinzena), com pico intenso em março.
-                        Mato Grosso do Sul: Plantio de setembro (1ª quinzena) até dezembro (2ª quinzena), com pico intenso em outubro e novembro. Colheita de janeiro (1ª quinzena) até abril (2ª quinzena), com pico intenso em fevereiro.
-                        Goiás: Plantio de outubro (1ª quinzena) até janeiro (1ª quinzena), com pico intenso em novembro e dezembro. Colheita de fevereiro (1ª quinzena) até abril (2ª quinzena), com pico intenso em março.
-                        Distrito Federal: Plantio de outubro (1ª quinzena) até janeiro (1ª quinzena), com pico intenso em novembro e dezembro. Colheita de fevereiro (1ª quinzena) até abril (2ª quinzena), com pico intenso em março.
-                        Minas Gerais: Plantio de outubro (1ª quinzena) até janeiro (1ª quinzena), com pico intenso em novembro e dezembro. Colheita de fevereiro (1ª quinzena) até maio (1ª quinzena), com pico intenso em março e abril.
-                        Espírito Santo: Plantio de outubro (1ª quinzena) até janeiro (1ª quinzena), com pico intenso em novembro e dezembro. Colheita de fevereiro (1ª quinzena) até maio (1ª quinzena), com pico intenso em março e abril.
-                        Rio de Janeiro: Plantio de outubro (1ª quinzena) até janeiro (1ª quinzena), com pico intenso em novembro e dezembro. Colheita de janeiro (1ª quinzena) até maio (2ª quinzena), com pico intenso em março e abril.
-                        São Paulo: Plantio de outubro (1ª quinzena) até janeiro (1ª quinzena), com pico intenso em novembro e dezembro. Colheita de fevereiro (1ª quinzena) até maio (1ª quinzena), com pico intenso em março e abril.
-                        Paraná: Plantio de setembro (1ª quinzena) até janeiro (1ª quinzena), com pico intenso em novembro e dezembro. Colheita de janeiro (1ª quinzena) até maio (1ª quinzena), com pico intenso em março e abril.
-                        Santa Catarina: Plantio de agosto (2ª quinzena) até dezembro (1ª quinzena), com pico intenso em outubro e novembro. Colheita de janeiro (1ª quinzena) até abril (2ª quinzena), com pico intenso em fevereiro e março.
-                        Rio Grande do Sul: Plantio de setembro (1ª quinzena) até dezembro (1ª quinzena), com pico intenso em outubro e novembro. Colheita de fevereiro (1ª quinzena) até maio (1ª quinzena), com pico intenso em março e abril.
-"""
-                        info_soja = """
-                        Roraima: Plantio de abril (2ª quinzena) até junho (2ª quinzena), com pico intenso em maio. Colheita de julho (2ª quinzena) até novembro (2ª quinzena), com pico intenso em setembro.
-                        Rondônia: Plantio de setembro (2ª quinzena) até janeiro (1ª quinzena), com pico intenso em novembro. Colheita de janeiro (1ª quinzena) até abril (1ª quinzena), com pico intenso em março.
-                        Amazonas: Plantio de setembro (1ª quinzena) até dezembro (1ª quinzena), com pico intenso em setembro e outubro. Colheita de dezembro (2ª quinzena) até março (2ª quinzena), com pico intenso em fevereiro.
-                        Pará: Plantio de outubro (1ª quinzena) até janeiro (2ª quinzena), com pico intenso em março. Colheita de fevereiro (2ª quinzena) até agosto (2ª quinzena), com pico intenso em março e julho.
-                        Tocantins: Plantio de outubro (1ª quinzena) até janeiro (1ª quinzena), com pico intenso em novembro e dezembro. Colheita de fevereiro (1ª quinzena) até maio (1ª quinzena), com pico intenso em março e abril.
-                        Maranhão: Plantio de outubro (1ª quinzena) até janeiro (2ª quinzena), com pico intenso em novembro e dezembro. Colheita de fevereiro (2ª quinzena) até maio (2ª quinzena), com pico intenso em março e abril.
-                        Piauí: Plantio de outubro (1ª quinzena) até janeiro (1ª quinzena), com pico intenso em novembro e dezembro. Colheita de março (1ª quinzena) até maio (2ª quinzena), com pico intenso em abril.
-                        Bahia: Plantio de outubro (1ª quinzena) até janeiro (2ª quinzena), com pico intenso em novembro e dezembro. Colheita de fevereiro (2ª quinzena) até maio (1ª quinzena), com pico intenso em março e abril.
-                        Mato Grosso: Plantio de setembro (1ª quinzena) até dezembro (2ª quinzena), com pico intenso em outubro e novembro. Colheita de janeiro (1ª quinzena) até abril (1ª quinzena), com pico intenso em fevereiro e março.
-                        Mato Grosso do Sul: Plantio de setembro (2ª quinzena) até dezembro (2ª quinzena), com pico intenso em outubro e novembro. Colheita de janeiro (2ª quinzena) até abril (1ª quinzena), com pico intenso em março.
-                        Goiás: Plantio de setembro (2ª quinzena) até janeiro (1ª quinzena), com pico intenso em outubro e novembro. Colheita de janeiro (2ª quinzena) até abril (1ª quinzena), com pico intenso em março.
-                        Distrito Federal: Plantio de outubro (1ª quinzena) até janeiro (1ª quinzena), com pico intenso em novembro e dezembro. Colheita de fevereiro (1ª quinzena) até maio (2ª quinzena), com pico intenso em março e abril.
-                        Minas Gerais: Plantio de outubro (1ª quinzena) até janeiro (1ª quinzena), com pico intenso em novembro e dezembro. Colheita de fevereiro (1ª quinzena) até maio (1ª quinzena), com pico intenso em março e abril.
-                        São Paulo: Plantio de setembro (2ª quinzena) até janeiro (1ª quinzena), com pico intenso em outubro e novembro. Colheita de janeiro (1ª quinzena) até abril (2ª quinzena), com pico intenso em março.
-                        Paraná: Plantio de setembro (2ª quinzena) até dezembro (2ª quinzena), com pico intenso em outubro e novembro. Colheita de janeiro (2ª quinzena) até abril (2ª quinzena), com pico intenso em março.
-                        Santa Catarina: Plantio de outubro (1ª quinzena) até dezembro (2ª quinzena), com pico intenso em novembro e dezembro. Colheita de janeiro (1ª quinzena) até maio (2ª quinzena), com pico intenso em março e abril.
-                        Rio Grande do Sul: Plantio de outubro (1ª quinzena) até janeiro (1ª quinzena), com pico intenso em novembro e dezembro. Colheita de fevereiro (1ª quinzena) até maio (1ª quinzena), com pico intenso em março e abril.
-"""
-                        info_milho = """
-                        Calendário de Safra: Milho 1ª Safra (Ciclo 120-180 dias)
-                        Rondônia: Plantio de agosto (2ª quinzena) até novembro (1ª quinzena), com pico intenso em setembro. Colheita de janeiro (2ª quinzena) até abril (2ª quinzena), com pico intenso em fevereiro.
-                        Acre: Plantio de setembro (2ª quinzena) até dezembro (1ª quinzena), com pico intenso em outubro. Colheita de fevereiro (1ª quinzena) até maio (2ª quinzena), com pico intenso em março.
-                        Amazonas: Plantio de outubro (1ª quinzena) até dezembro (2ª quinzena), com pico intenso em novembro. Colheita de março (2ª quinzena) até junho (2ª quinzena), com pico intenso em abril.
-                        Pará: Plantio de outubro (1ª quinzena) até janeiro (1ª quinzena), com pico intenso em novembro. Colheita de março (2ª quinzena) até junho (2ª quinzena), com pico intenso em maio.
-                        Tocantins: Plantio de outubro (1ª quinzena) até janeiro (1ª quinzena), com pico intenso em novembro e dezembro. Colheita de março (2ª quinzena) até junho (2ª quinzena), com pico intenso em maio.
-                        Maranhão: Plantio de outubro (1ª quinzena) até janeiro (2ª quinzena), com pico intenso em novembro. Colheita de março (2ª quinzena) até junho (2ª quinzena), com pico intenso em abril.
-                        Piauí: Plantio de outubro (1ª quinzena) até janeiro (2ª quinzena), com pico intenso em novembro e dezembro. Colheita de abril (1ª quinzena) até junho (2ª quinzena), com pico intenso em maio.
-                        Pernambuco: Plantio de outubro (2ª quinzena) até janeiro (2ª quinzena), com pico intenso em dezembro. Colheita de abril (2ª quinzena) até junho (2ª quinzena), com pico intenso em maio.
-                        Bahia: Plantio de outubro (1ª quinzena) até fevereiro (1ª quinzena), com pico intenso em novembro e dezembro. Colheita de março (2ª quinzena) até julho (1ª quinzena), com pico intenso em abril e maio.
-                        Mato Grosso: Plantio de setembro (2ª quinzena) até dezembro (1ª quinzena), com pico intenso em outubro e novembro. Colheita de fevereiro (1ª quinzena) até maio (1ª quinzena), com pico intenso em março e abril.
-                        Mato Grosso do Sul: Plantio de agosto (2ª quinzena) até novembro (2ª quinzena), com pico intenso em setembro e outubro. Colheita de janeiro (2ª quinzena) até abril (1ª quinzena), com pico intenso em março.
-                        Goiás: Plantio de setembro (2ª quinzena) até janeiro (1ª quinzena), com pico intenso em outubro e novembro. Colheita de janeiro (2ª quinzena) até junho (1ª quinzena), com pico intenso em março e abril.
-                        Distrito Federal: Plantio de setembro (2ª quinzena) até dezembro (2ª quinzena), com pico intenso em outubro e novembro. Colheita de fevereiro (2ª quinzena) até junho (1ª quinzena), com pico intenso em abril.
-                        Minas Gerais: Plantio de setembro (2ª quinzena) até janeiro (1ª quinzena), com pico intenso em outubro, novembro e dezembro. Colheita de fevereiro (2ª quinzena) até junho (1ª quinzena), com pico intenso em maio.
-                        Espírito Santo: Plantio de agosto (2ª quinzena) até dezembro (2ª quinzena), com pico intenso em setembro e outubro. Colheita de janeiro (2ª quinzena) até maio (2ª quinzena), com pico intenso em março.
-                        Rio de Janeiro: Plantio de setembro (1ª quinzena) até dezembro (2ª quinzena), com pico intenso em outubro e novembro. Colheita de fevereiro (1ª quinzena) até junho (1ª quinzena), com pico intenso em março e abril.
-                        São Paulo: Plantio de setembro (1ª quinzena) até dezembro (2ª quinzena), com pico intenso em outubro e novembro. Colheita de janeiro (1ª quinzena) até julho (1ª quinzena), com pico intenso em março e abril.
-                        Paraná: Plantio de agosto (2ª quinzena) até dezembro (1ª quinzena), com pico intenso em setembro e outubro. Colheita de janeiro (2ª quinzena) até junho (2ª quinzena), com pico intenso em março.
-                        Santa Catarina: Plantio de agosto (1ª quinzena) até dezembro (1ª quinzena), com pico intenso em setembro e outubro. Colheita de janeiro (1ª quinzena) até maio (2ª quinzena), com pico intenso em março e abril.
-                        Rio Grande do Sul: Plantio de agosto (1ª quinzena) até novembro (2ª quinzena), com pico intenso em setembro e outubro. Colheita de dezembro (2ª quinzena) até maio (2ª quinzena), com pico intenso em fevereiro e março.
-                        Calendário de Safra: Milho 2ª Safra (Ciclo 120-180 dias)
-                        Roraima: Plantio de maio (1ª quinzena) até junho (2ª quinzena), com pico intenso em maio. Colheita de setembro (2ª quinzena) até novembro (2ª quinzena), com pico intenso em outubro.
-                        Rondônia: Plantio de janeiro (2ª quinzena) até março (1ª quinzena), com pico intenso em fevereiro. Colheita de maio (2ª quinzena) até agosto (2ª quinzena), com pico intenso em julho e agosto.
-                        Amapá: Plantio de fevereiro (1ª quinzena) até março (2ª quinzena), com pico intenso em fevereiro. Colheita de maio (2ª quinzena) até julho (1ª quinzena), com pico intenso em maio e junho.
-                        Pará: Plantio de janeiro (1ª quinzena) até março (1ª quinzena), com pico intenso em janeiro e fevereiro. Colheita de abril (2ª quinzena) até novembro (2ª quinzena), com pico intenso em maio.
-                        Tocantins: Plantio de janeiro (1ª quinzena) até março (2ª quinzena), com pico intenso de janeiro a março. Colheita de maio (2ª quinzena) até agosto (1ª quinzena), com pico intenso em julho.
-                        Maranhão: Plantio de janeiro (1ª quinzena) até março (2ª quinzena), com pico intenso em janeiro e fevereiro. Colheita de maio (1ª quinzena) até agosto (2ª quinzena), com pico intenso em junho e julho.
-                        Piauí: Plantio de janeiro (1ª quinzena) até março (1ª quinzena), com pico intenso em janeiro e fevereiro. Colheita de maio (1ª quinzena) até agosto (1ª quinzena), com pico intenso em junho e julho.
-                        Ceará: Plantio de janeiro (1ª quinzena) até março (2ª quinzena), com pico intenso em janeiro e fevereiro. Colheita de maio (2ª quinzena) até agosto (1ª quinzena), com pico intenso em julho.
-                        Rio Grande do Norte: Plantio de fevereiro (1ª quinzena) até março (2ª quinzena), com pico intenso em fevereiro. Colheita de julho (1ª quinzena) até setembro (2ª quinzena), com pico intenso em agosto.
-                        Paraíba: Plantio de março (1ª quinzena) até abril (2ª quinzena), com pico intenso em março e abril. Colheita de julho (1ª quinzena) até setembro (2ª quinzena), com pico intenso em agosto.
-                        Pernambuco: Plantio de março (1ª quinzena) até abril (2ª quinzena), com pico intenso em março e abril. Colheita de julho (1ª quinzena) até outubro (2ª quinzena), com pico intenso em agosto e setembro.
-                        Alagoas: Plantio de abril (2ª quinzena) até junho (2ª quinzena), com pico intenso em maio. Colheita de setembro (1ª quinzena) até dezembro (1ª quinzena), com pico intenso em outubro.
-                        Sergipe: Plantio de abril (2ª quinzena) até junho (1ª quinzena), com pico intenso em maio. Colheita de setembro (1ª quinzena) até dezembro (1ª quinzena), com pico intenso em outubro e novembro.
-                        Bahia: Plantio de abril (2ª quinzena) até junho (1ª quinzena), com pico intenso em maio. Colheita de agosto (2ª quinzena) até novembro (2ª quinzena), com pico intenso em outubro.
-                        Mato Grosso: Plantio de janeiro (2ª quinzena) até março (1ª quinzena), com pico intenso em fevereiro. Colheita de maio (2ª quinzena) até agosto (1ª quinzena), com pico intenso em junho e julho.
-                        Mato Grosso do Sul: Plantio de janeiro (1ª quinzena) até março (2ª quinzena), com pico intenso em fevereiro. Colheita de maio (2ª quinzena) até setembro (1ª quinzena), com pico intenso em julho.
-                        Goiás: Plantio de janeiro (1ª quinzena) até março (1ª quinzena), com pico intenso em fevereiro. Colheita de maio (1ª quinzena) até setembro (1ª quinzena), com pico intenso em junho e julho.
-                        Distrito Federal: Plantio de janeiro (1ª quinzena) até fevereiro (2ª quinzena), com pico intenso em janeiro e fevereiro. Colheita de maio (2ª quinzena) até agosto (2ª quinzena), com pico intenso em junho e julho.
-                        Minas Gerais: Plantio de janeiro (1ª quinzena) até março (2ª quinzena), com pico intenso em fevereiro. Colheita de maio (2ª quinzena) até setembro (1ª quinzena), com pico intenso em julho.
-                        Espírito Santo: Plantio de fevereiro (1ª quinzena) até março (1ª quinzena), com pico intenso em fevereiro. Colheita de junho (1ª quinzena) até agosto (2ª quinzena), com pico intenso em julho.
-                        Rio de Janeiro: Plantio de fevereiro (1ª quinzena) até março (1ª quinzena), com pico intenso em fevereiro. Colheita de junho (1ª quinzena) até agosto (1ª quinzena), com pico intenso em julho.
-                        São Paulo: Plantio de janeiro (2ª quinzena) até março (2ª quinzena), com pico intenso em fevereiro e março. Colheita de junho (1ª quinzena) até setembro (2ª quinzena), com pico intenso em julho e agosto.
-                        Paraná: Plantio de janeiro (2ª quinzena) até abril (1ª quinzena), com pico intenso em março. Colheita de junho (1ª quinzena) até outubro (1ª quinzena), com pico intenso em agosto e setembro.
-                        Santa Catarina: Plantio de janeiro (1ª quinzena) até fevereiro (1ª quinzena), com pico intenso em janeiro. Colheita de maio (1ª quinzena) até junho (2ª quinzena), com pico intenso em maio e junho.
-
-"""
-                        info_trigo_cana = """
-                        Calendário de Safra: Trigo (Ciclo 120-135 dias)
-                        Mato Grosso do Sul: Plantio de março (2ª quinzena) até maio (2ª quinzena), com pico intenso em abril. Colheita de agosto (1ª quinzena) até setembro (2ª quinzena), com pico intenso em agosto.
-                        Goiás: Plantio de abril (1ª quinzena) até maio (2ª quinzena), com pico intenso em maio. Colheita de agosto (1ª quinzena) até outubro (1ª quinzena), com pico intenso em setembro.
-                        Distrito Federal: Plantio de abril (1ª quinzena) até maio (2ª quinzena), com pico intenso em maio. Colheita de agosto (1ª quinzena) até outubro (1ª quinzena), com pico intenso em setembro.
-                        Minas Gerais: Plantio de fevereiro (2ª quinzena) até maio (2ª quinzena), com pico intenso em março e abril. Colheita de julho (1ª quinzena) até setembro (1ª quinzena), com pico intenso em julho e agosto.
-                        São Paulo: Plantio de março (2ª quinzena) até junho (1ª quinzena), com pico intenso em abril e maio. Colheita de julho (2ª quinzena) até outubro (2ª quinzena), com pico intenso em agosto e setembro.
-                        Paraná: Plantio de abril (1ª quinzena) até julho (1ª quinzena), com pico intenso em maio e junho. Colheita de agosto (2ª quinzena) até novembro (2ª quinzena), com pico intenso em setembro e outubro.
-                        Santa Catarina: Plantio de maio (2ª quinzena) até agosto (2ª quinzena), com pico intenso em junho e julho. Colheita de outubro (2ª quinzena) até dezembro (2ª quinzena), com pico intenso em novembro e dezembro.
-                        Rio Grande do Sul: Plantio de maio (1ª quinzena) até agosto (1ª quinzena), com pico intenso em junho e julho. Colheita de outubro (1ª quinzena) até dezembro (2ª quinzena), com pico intenso em novembro e dezembro.
-                        Calendário de Safra: Cana-de-Açúcar
-                        (Diferente dos grãos, a cana possui ciclos de colheita e plantio mais extensos e contínuos em várias regiões)
-                        Centro-Oeste: Plantio de janeiro (1ª quinzena) até julho (1ª quinzena) e de outubro (1ª quinzena) até dezembro (2ª quinzena). Colheita de abril (1ª quinzena) até novembro (2ª quinzena).
-                        Nordeste: Plantio de janeiro (1ª quinzena) até abril (2ª quinzena) e de setembro (1ª quinzena) até dezembro (2ª quinzena). Colheita de janeiro (2ª quinzena) até maio (1ª quinzena) e de agosto (2ª quinzena) até outubro (2ª quinzena).
-                        Norte: Plantio de outubro (1ª quinzena) até dezembro (2ª quinzena). Colheita de maio (1ª quinzena) até outubro (2ª quinzena).
-                        Sudeste: Plantio de janeiro (1ª quinzena) até julho (1ª quinzena) e de outubro (1ª quinzena) até dezembro (2ª quinzena). Colheita de abril (1ª quinzena) até novembro (2ª quinzena).
-                        Sul: Plantio de janeiro (1ª quinzena) até julho (1ª quinzena) e de outubro (1ª quinzena) até dezembro (2ª quinzena). Colheita de abril (1ª quinzena) até novembro (2ª quinzena).
-"""
-
-                        conhecimento_safras = f"""
-                        ### BEGIN DADOS_SAFRA ###
-                        {info_algodao}
-                        {info_arroz}
-                        {info_soja}
-                        {info_milho}
-                        {info_trigo_cana}
-                        ### END DADOS_SAFRA ###
-                        """
-
                         prompt_calendario = f'''
                         {contexto_agente}
-
-                        {conhecimento_safras}
 
                         GERAR CALENDÁRIO COM ESTAS REGRAS:
 
@@ -3145,7 +3320,6 @@ Victrato pelo Brasil - Soja e Cana - Ação nacional""",
                         6. Praticamente todos os dias com conteúdo
                         7. NUNCA 3 dias consecutivos sem pautas
                         8. Baseie pautas no contexto do mês
-                        9. As pautas devem respeitar COM RIGIDEZ as fases reais de cada cultura por estados descritos no bloco 'DADOS_SAFRA'
                         
                         FORMATO:
                         - Célula: "[EMOJI] Produto(s) - Cultura(s) - Tema - Breve descrição"
