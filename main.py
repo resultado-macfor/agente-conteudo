@@ -37,6 +37,8 @@ ASTRA_DB_COLLECTION = os.getenv('ASTRA_DB_COLLECTION')
 
 senha_admin = os.getenv('SENHA_ADMIN')
 
+mongo_uri = os.getenv('MONGO_URI')
+
 
 senha_syn = os.getenv('SENHA_SYN')
 senha_sme = os.getenv('SENHA_SME')
@@ -333,7 +335,7 @@ if not st.session_state.logged_in:
     st.stop()
 
 # --- CONEXÃO MONGODB (após login) ---
-client = MongoClient("mongodb+srv://gustavoromao3345:RqWFPNOJQfInAW1N@cluster0.5iilj.mongodb.net/auto_doc?retryWrites=true&w=majority&ssl=true&ssl_cert_reqs=CERT_NONE&tlsAllowInvalidCertificates=true")
+client = MongoClient(mongo_uri)
 db = client['agentes_personalizados']
 collection_agentes = db['agentes']
 collection_conversas = db['conversas']
