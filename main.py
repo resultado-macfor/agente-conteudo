@@ -35,6 +35,8 @@ ASTRA_DB_APPLICATION_TOKEN = os.getenv('ASTRA_DB_APPLICATION_TOKEN')
 ASTRA_DB_NAMESPACE = os.getenv('ASTRA_DB_NAMESPACE')
 ASTRA_DB_COLLECTION = os.getenv('ASTRA_DB_COLLECTION')
 
+senha_admin = os.getenv('SENHA_ADMIN')
+
 class AstraDBClient:
     def __init__(self):
         self.base_url = f"{ASTRA_DB_API_ENDPOINT}/api/json/v1/{ASTRA_DB_NAMESPACE}"
@@ -290,7 +292,7 @@ def check_hashes(password, hashed_text):
 
 # Dados de usuário (em produção, isso deve vir de um banco de dados seguro)
 users = {
-    "admin": make_hashes("senha1234"),  # admin/senha1234
+    "admin": make_hashes({senha_admin}),  # admin/senha1234
     "SYN": make_hashes("senha1"),  # user1/password1
     "SME": make_hashes("senha2"),   # user2/password2
     "Enterprise": make_hashes("senha3")   # user2/password2
