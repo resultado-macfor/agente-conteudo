@@ -292,7 +292,7 @@ def check_hashes(password, hashed_text):
 
 # Dados de usuário (em produção, isso deve vir de um banco de dados seguro)
 users = {
-    "admin": make_hashes({senha_admin}),  # admin/senha1234
+    "admin": make_hashes(senha_admin),  # admin/senha1234
     "SYN": make_hashes("senha1"),  # user1/password1
     "SME": make_hashes("senha2"),   # user2/password2
     "Enterprise": make_hashes("senha3")   # user2/password2
