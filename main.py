@@ -1064,7 +1064,7 @@ with tab_conteudo:
     
     # Conexão com MongoDB para briefings
     try:
-        client2 = MongoClient("mongodb+srv://gustavoromao3345:RqWFPNOJQfInAW1N@cluster0.5iilj.mongodb.net/auto_doc?retryWrites=true&w=majority&ssl=true&ssl_cert_reqs=CERT_NONE&tlsAllowInvalidCertificates=true")
+        client2 = MongoClient(mongo_uri)
         db_briefings = client2['briefings_Broto_Tecnologia']
         collection_briefings = db_briefings['briefings']
         mongo_connected_conteudo = True
@@ -1432,7 +1432,7 @@ with tab_blog:
 
     # Conexão com MongoDB
     try:
-        client_mongo = MongoClient("mongodb+srv://gustavoromao3345:RqWFPNOJQfInAW1N@cluster0.5iilj.mongodb.net/auto_doc?retryWrites=true&w=majority&ssl=true&ssl_cert_reqs=CERT_NONE&tlsAllowInvalidCertificates=true")
+        client_mongo = MongoClient(mongo_uri)
         db = client_mongo['blog_posts_agricolas']
         collection_posts = db['posts_gerados']
         collection_briefings = db['briefings']
