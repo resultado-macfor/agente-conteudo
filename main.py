@@ -37,6 +37,11 @@ ASTRA_DB_COLLECTION = os.getenv('ASTRA_DB_COLLECTION')
 
 senha_admin = os.getenv('SENHA_ADMIN')
 
+
+senha_syn = os.getenv('SENHA_SYN')
+senha_sme = os.getenv('SENHA_SME')
+senha_ent = os.getenv('SENHA_ENT')
+
 class AstraDBClient:
     def __init__(self):
         self.base_url = f"{ASTRA_DB_API_ENDPOINT}/api/json/v1/{ASTRA_DB_NAMESPACE}"
@@ -293,9 +298,9 @@ def check_hashes(password, hashed_text):
 # Dados de usuário (em produção, isso deve vir de um banco de dados seguro)
 users = {
     "admin": make_hashes(senha_admin),  # admin/senha1234
-    "SYN": make_hashes("senha1"),  # user1/password1
-    "SME": make_hashes("senha2"),   # user2/password2
-    "Enterprise": make_hashes("senha3")   # user2/password2
+    "SYN": make_hashes(senha_syn),  # user1/password1
+    "SME": make_hashes(senha_sme),   # user2/password2
+    "Enterprise": make_hashes(senha_ent)   # user2/password2
 }
 
 def get_current_user():
@@ -561,7 +566,7 @@ def check_admin_password():
     
     def admin_password_entered():
         """Verifica se a senha de admin está correta."""
-        if st.session_state["admin_password"] == "senha123":
+        if st.session_state["admin_password"] == senha_admin:
             st.session_state["admin_password_correct"] = True
             st.session_state["admin_user"] = "admin"
             del st.session_state["admin_password"]
