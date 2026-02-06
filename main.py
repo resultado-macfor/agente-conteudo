@@ -204,6 +204,8 @@ def reescrever_com_rag_revisao_SEO(content: str) -> str:
 
         Aplique isso ao texto original:
 
+        
+
         1. SUBSTITUA termos vagos por terminologia técnica precisa da área agrícola que são relevantes ao texto original.
         2. CORRIGIR automaticamente qualquer imprecisão técnica ou científica no texto original
         3. ENRIQUECER com dados concretos, números e informações específicas da base
@@ -2764,9 +2766,11 @@ with tab_otimizacao:
             
             # Construir prompt para busca
             prompt = f"""
-            Você é um assistente especializado em pesquisa agrícola. Busque informações atualizadas e confiáveis sobre:
+            Você é um assistente especializado em pesquisa. Busque informações atualizadas e confiáveis sobre:
             
             TÓPICO PRINCIPAL: {texto}
+
+        
             
             CRITÉRIOS DE PESQUISA:
             1. Fontes confiáveis: Embrapa, universidades, órgãos governamentais, institutos de pesquisa
@@ -2996,6 +3000,41 @@ with tab_otimizacao:
 
                     ## REQUISITOS OBRIGATÓRIOS:
 
+                    VOCÊ É: Um especialista em SEO técnico agrícola.
+
+                    TAREFA: Otimizar o conteúdo para SEO, focando especialmente na estrutura de headings.
+                    
+                    HEADING SOLICITADO NO BRIEFING: {nivel_heading}
+                    
+                    SIGA ESTE PROCESSO EM 4 ETAPAS:
+                    
+                    ETAPA 1 - ANÁLISE ESTRUTURAL:
+                    1. Identificar TODOS os headings no texto
+                    2. Verificar se estão no nível {nivel_heading}
+                    3. Se não estiverem, corrigir para {nivel_heading}
+                    4. Manter a hierarquia lógica
+                    
+                    ETAPA 2 - OTIMIZAÇÃO SEO:
+                    1. Garantir que o primeiro heading seja {nivel_heading} com palavra-chave
+                    2. Incluir palavra-chave em 50% dos headings
+                    3. Headings devem ser descritivos e incluir benefícios
+                    4. Máximo de 300 palavras entre headings
+                    
+                    ETAPA 3 - CONTEÚDO:
+                    1. Bullets para listas (máx 5 itens)
+                    2. Parágrafos curtos (3-4 frases)
+                    3. CTAs claros
+                    4. Dados concretos quando possível
+                    
+                    ETAPA 4 - META TAGS:
+                    Gerar 3 opções de title/description otimizadas.
+                    
+                    FORMATO DE RESPOSTA:
+                    [Conteúdo otimizado com headings corrigidos]
+                    
+                    Heading corrections applied:
+                    - "Original heading" → "Corrected {nivel_heading}
+
                     1. **TITLES E DESCRIPTIONS (OBRIGATÓRIO):**
                        Gere 3 opções de meta title (≤60 chars) e description (≤155 chars)
                        Exemplo:
@@ -3150,6 +3189,41 @@ with tab_otimizacao:
                         - Meta tags existentes
                         - Heading level {nivel_heading}
                         - Bullets onde aplicável
+
+                        VOCÊ É: Um especialista em SEO técnico agrícola.
+
+TAREFA: Otimizar o conteúdo para SEO, focando especialmente na estrutura de headings.
+
+HEADING SOLICITADO NO BRIEFING: {nivel_heading}
+
+SIGA ESTE PROCESSO EM 4 ETAPAS:
+
+ETAPA 1 - ANÁLISE ESTRUTURAL:
+1. Identificar TODOS os headings no texto
+2. Verificar se estão no nível {nivel_heading}
+3. Se não estiverem, corrigir para {nivel_heading}
+4. Manter a hierarquia lógica
+
+ETAPA 2 - OTIMIZAÇÃO SEO:
+1. Garantir que o primeiro heading seja {nivel_heading} com palavra-chave
+2. Incluir palavra-chave em 50% dos headings
+3. Headings devem ser descritivos e incluir benefícios
+4. Máximo de 300 palavras entre headings
+
+ETAPA 3 - CONTEÚDO:
+1. Bullets para listas (máx 5 itens)
+2. Parágrafos curtos (3-4 frases)
+3. CTAs claros
+4. Dados concretos quando possível
+
+ETAPA 4 - META TAGS:
+Gerar 3 opções de title/description otimizadas.
+
+FORMATO DE RESPOSTA:
+[Conteúdo otimizado com headings corrigidos]
+
+Heading corrections applied:
+- "Original heading" → "Corrected {nivel_heading}
                         
                         Aplique os ajustes e retorne APENAS o conteúdo atualizado.
                         """
