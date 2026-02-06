@@ -2865,7 +2865,7 @@ with tab_otimizacao:
                     {contexto_agente}
                     ###END contexto agente###
 
-                    Instruções: Você é um especialista em agronomia e redator técnico. Com base nas informações fornecidas no formato abaixo, gere um artigo completo e bem estruturado sobre o ciclo de desenvolvimento de uma cultura agrícola, seguindo rigorosamente a estrutura, diretrizes e marcação solicitadas.
+                    Instruções: Você é um especialista redator técnico. Com base nas informações fornecidas no formato abaixo, gere um artigo completo e bem estruturado sobre o ciclo de desenvolvimento de uma cultura agrícola, seguindo rigorosamente a estrutura, diretrizes e marcação solicitadas.
 
                     ############BEGIN Formato de Entrada################
                     TÍTULO/H1 desejado: [Título do artigo]
@@ -2883,6 +2883,7 @@ with tab_otimizacao:
                     Links externos obrigatórios (se houver): [Lista ou "não aplicável"]
                     Diretrizes de tom/estilo (brand voice): [Ex.: técnico e leve]
                     Observações/restrições: [Informações adicionais]
+                    Frases e parágrafos devem ser mais curtos
                     ############END Formato de Entrada################
 
                     
@@ -2941,6 +2942,8 @@ with tab_otimizacao:
                         Objetividade: Forneça informações práticas e acionáveis. Evite linguagem excessivamente promocional no corpo do texto.
                     
                         Completude: Certifique-se de que todos os elementos da entrada foram atendidos (KWs, estrutura, CTA).
+
+                        Frases e parágrafos devem ser mais curtos
                     
                         Formatação: Use negrito para termos técnicos importantes ou frases de impacto ocasionais. Use marcadores apenas em listas de itens muito concisos (ex.: características de um estágio). Prefira parágrafos fluidos.
                     
@@ -2997,6 +3000,7 @@ with tab_otimizacao:
                     - Heading level: {nivel_heading}
                     - Links internos: {"Sim" if incluir_links_internos else "Não"}
                     - Busca web usada: {"Sim" if fontes_encontradas else "Não"}
+                    - Frases e parágrafos devem ser mais curtos
 
                     ## REQUISITOS OBRIGATÓRIOS:
 
@@ -3059,6 +3063,7 @@ with tab_otimizacao:
                        - Melhore escaneabilidade
                        - Divida frases complexas
                        - Incorpore dados das fontes quando relevante
+                       - Frases e parágrafos devem ser mais curtos
 
                     5. **LINKS INTERNOS:**
                        Sugira 3-5 links relevantes no formato: [texto âncora](url)
@@ -3189,41 +3194,42 @@ with tab_otimizacao:
                         - Meta tags existentes
                         - Heading level {nivel_heading}
                         - Bullets onde aplicável
+                        - Frases e parágrafos devem ser mais curtos
 
                         VOCÊ É: Um especialista em SEO técnico agrícola.
 
-TAREFA: Otimizar o conteúdo para SEO, focando especialmente na estrutura de headings.
-
-HEADING SOLICITADO NO BRIEFING: {nivel_heading}
-
-SIGA ESTE PROCESSO EM 4 ETAPAS:
-
-ETAPA 1 - ANÁLISE ESTRUTURAL:
-1. Identificar TODOS os headings no texto
-2. Verificar se estão no nível {nivel_heading}
-3. Se não estiverem, corrigir para {nivel_heading}
-4. Manter a hierarquia lógica
-
-ETAPA 2 - OTIMIZAÇÃO SEO:
-1. Garantir que o primeiro heading seja {nivel_heading} com palavra-chave
-2. Incluir palavra-chave em 50% dos headings
-3. Headings devem ser descritivos e incluir benefícios
-4. Máximo de 300 palavras entre headings
-
-ETAPA 3 - CONTEÚDO:
-1. Bullets para listas (máx 5 itens)
-2. Parágrafos curtos (3-4 frases)
-3. CTAs claros
-4. Dados concretos quando possível
-
-ETAPA 4 - META TAGS:
-Gerar 3 opções de title/description otimizadas.
-
-FORMATO DE RESPOSTA:
-[Conteúdo otimizado com headings corrigidos]
-
-Heading corrections applied:
-- "Original heading" → "Corrected {nivel_heading}
+                        TAREFA: Otimizar o conteúdo para SEO, focando especialmente na estrutura de headings.
+                        
+                        HEADING SOLICITADO NO BRIEFING: {nivel_heading}
+                        
+                        SIGA ESTE PROCESSO EM 4 ETAPAS:
+                        
+                        ETAPA 1 - ANÁLISE ESTRUTURAL:
+                        1. Identificar TODOS os headings no texto
+                        2. Verificar se estão no nível {nivel_heading}
+                        3. Se não estiverem, corrigir para {nivel_heading}
+                        4. Manter a hierarquia lógica
+                        
+                        ETAPA 2 - OTIMIZAÇÃO SEO:
+                        1. Garantir que o primeiro heading seja {nivel_heading} com palavra-chave
+                        2. Incluir palavra-chave em 50% dos headings
+                        3. Headings devem ser descritivos e incluir benefícios
+                        4. Máximo de 300 palavras entre headings
+                        
+                        ETAPA 3 - CONTEÚDO:
+                        1. Bullets para listas (máx 5 itens)
+                        2. Parágrafos curtos (3-4 frases)
+                        3. CTAs claros
+                        4. Dados concretos quando possível
+                        
+                        ETAPA 4 - META TAGS:
+                        Gerar 3 opções de title/description otimizadas.
+                        
+                        FORMATO DE RESPOSTA:
+                        [Conteúdo otimizado com headings corrigidos]
+                        
+                        Heading corrections applied:
+                        - "Original heading" → "Corrected {nivel_heading}
                         
                         Aplique os ajustes e retorne APENAS o conteúdo atualizado.
                         """
