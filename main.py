@@ -2249,6 +2249,7 @@ with tab_revisao_tecnica:
         **SUA TAREFA:** 
         1. Reescrever o texto original aplicando correções técnicas baseadas nos documentos de referência
         2. Gerar um relatório DETALHADO de TODAS as mudanças realizadas
+        3. Você deve manter a estrutura original do texto. Você deve realizar apenas mudanças e enriquecimentos conforme o contexto novo vindo da base técnica de referência. O texto original deve sempre ser o molde a ser seguido.
 
         **FORMATO DE SAÍDA EXIGIDO (use exatamente esta estrutura):**
 
