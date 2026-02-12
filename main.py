@@ -1428,7 +1428,7 @@ Pontos-chave: [lista os principais pontos]""")
                 st.warning(f"Erro ao carregar histórico: {str(e)}")
 
 # ========== ABA: BLOG INTELIGENTE COM RAG TÉCNICO + PERPLEXITY ==========
-with tab_blog:  # NOVA ABA - precisa adicionar na lista de tabs
+with tab_blog_rag:  # NOVA ABA - precisa adicionar na lista de tabs
     st.header("🌱 Blog Inteligente com RAG Técnico + Perplexity")
     st.markdown("**Geração de conteúdo agrícola com base na base técnica + busca web com fontes citadas**")
     
@@ -1443,7 +1443,7 @@ with tab_blog:  # NOVA ABA - precisa adicionar na lista de tabs
         collection_posts_rag = db_blog_rag['posts_rag']
         collection_analises_rag = db_blog_rag['analises_tecnicas']
         collection_fontes_rag = db_blog_rag['fontes_perplexity']
-        collection_versoes_rag = db_blog_rag['versoes_ajustes']  # NOVA COLLECTION
+        collection_versoes_rag = db_blog_rag['versoes_ajustes']
         mongo_connected_blog_rag = True
     except Exception as e:
         st.error(f"❌ Erro na conexão com MongoDB: {str(e)}")
@@ -1468,9 +1468,9 @@ with tab_blog:  # NOVA ABA - precisa adicionar na lista de tabs
     if 'briefing_atual' not in st.session_state:
         st.session_state.briefing_atual = None
     if 'historico_ajustes' not in st.session_state:
-        st.session_state.historico_ajustes = []  # LISTA DE AJUSTES REALIZADOS
+        st.session_state.historico_ajustes = []
     if 'versoes_conteudo' not in st.session_state:
-        st.session_state.versoes_conteudo = []  # VERSÕES ANTERIORES
+        st.session_state.versoes_conteudo = []
     
     # ============================================
     # 3. LAYOUT PRINCIPAL - COLUNAS
@@ -1600,31 +1600,36 @@ with tab_blog:  # NOVA ABA - precisa adicionar na lista de tabs
         rag_taxonomia_blog = st.checkbox(
             "RAG Taxonomia Fitopatológica", 
             value=True,
-            help="Busca específica por classificação de patógenos, nomenclatura científica"
+            help="Busca específica por classificação de patógenos, nomenclatura científica",
+            key="rag_taxonomia_blog"
         )
         
         rag_epidemiologia_blog = st.checkbox(
             "RAG Epidemiologia", 
             value=True,
-            help="Condições ambientais, temperaturas, umidade, períodos de molhamento"
+            help="Condições ambientais, temperaturas, umidade, períodos de molhamento",
+            key="rag_epidemiologia_blog"
         )
         
         rag_produtos_blog = st.checkbox(
             "RAG Produtos e Soluções", 
             value=True,
-            help="Modo de ação, eficácia, recomendações técnicas, doses"
+            help="Modo de ação, eficácia, recomendações técnicas, doses",
+            key="rag_produtos_blog"
         )
         
         rag_praticas_blog = st.checkbox(
             "RAG Práticas Agrícolas", 
             value=True,
-            help="Manejo integrado, boas práticas, recomendações técnicas"
+            help="Manejo integrado, boas práticas, recomendações técnicas",
+            key="rag_praticas_blog"
         )
         
         rag_geral_blog = st.checkbox(
             "RAG Geral (similaridade)", 
             value=True,
-            help="Busca geral por similaridade semântica"
+            help="Busca geral por similaridade semântica",
+            key="rag_geral_blog"
         )
         
         st.markdown("---")
@@ -1671,6 +1676,17 @@ with tab_blog:  # NOVA ABA - precisa adicionar na lista de tabs
                 value=True,
                 key="pesquisas_perplexity"
             )
+        
+        # === CONFIGURAÇÃO DE CONTEXTO DO AGENTE - DEFINIDA AQUI ===
+        st.markdown("---")
+        st.markdown("**🤖 Contexto do Agente**")
+        
+        usar_contexto_agente_blog = st.checkbox(
+            "Usar contexto do agente selecionado", 
+            value=bool(st.session_state.agente_selecionado),
+            key="usar_contexto_agente_blog_rag",
+            help="Incorporar as diretrizes do agente ativo no prompt de geração"
+        )
         
         st.markdown("---")
         
@@ -2160,7 +2176,7 @@ with tab_blog:  # NOVA ABA - precisa adicionar na lista de tabs
             }
     
     # ============================================
-    # 8. NOVA FUNÇÃO: AJUSTE PONTUAL DO CONTEÚDO
+    # 8. FUNÇÃO: AJUSTE PONTUAL DO CONTEÚDO
     # ============================================
     
     def ajustar_conteudo_pontualmente(
@@ -2353,9 +2369,9 @@ with tab_blog:  # NOVA ABA - precisa adicionar na lista de tabs
                 
                 st.session_state.briefing_atual = briefing
                 
-                # 2. CONTEXTO DO AGENTE
+                # 2. CONTEXTO DO AGENTE - AGORA A VARIÁVEL ESTÁ DEFINIDA
                 contexto_agente = ""
-                if usar_contexto_agente_blog and st.session_state.agente_selecionado:
+                if 'usar_contexto_agente_blog' in locals() and usar_contexto_agente_blog and st.session_state.agente_selecionado:
                     agente = st.session_state.agente_selecionado
                     contexto_agente = construir_contexto(agente, st.session_state.segmentos_selecionados)
                 
@@ -2363,11 +2379,11 @@ with tab_blog:  # NOVA ABA - precisa adicionar na lista de tabs
                 st.info("🔍 Fase 1: Consultando base técnica com RAGs especializados...")
                 
                 rags_ativos = {
-                    'taxonomia': rag_taxonomia_blog,
-                    'epidemiologia': rag_epidemiologia_blog,
-                    'produtos': rag_produtos_blog,
-                    'praticas': rag_praticas_blog,
-                    'geral': rag_geral_blog
+                    'taxonomia': rag_taxonomia_blog if 'rag_taxonomia_blog' in locals() else False,
+                    'epidemiologia': rag_epidemiologia_blog if 'rag_epidemiologia_blog' in locals() else False,
+                    'produtos': rag_produtos_blog if 'rag_produtos_blog' in locals() else False,
+                    'praticas': rag_praticas_blog if 'rag_praticas_blog' in locals() else False,
+                    'geral': rag_geral_blog if 'rag_geral_blog' in locals() else True
                 }
                 
                 if not any(rags_ativos.values()):
@@ -2377,7 +2393,7 @@ with tab_blog:  # NOVA ABA - precisa adicionar na lista de tabs
                 resultados_rag = consolidar_rags_blog(
                     f"{problema_principal} {pragas_alvo} {solucao_produto}",
                     rags_ativos,
-                    numero_documentos
+                    numero_documentos if 'numero_documentos' in locals() else 10
                 )
                 
                 st.session_state.documentos_recuperados_blog = resultados_rag['documentos']
@@ -2386,7 +2402,7 @@ with tab_blog:  # NOVA ABA - precisa adicionar na lista de tabs
                 # 4. PROCESSAR PERPLEXITY
                 resultados_perplexity = {"resultado": None, "fontes": [], "erro": None}
                 
-                if usar_perplexity_blog:
+                if 'usar_perplexity_blog' in locals() and usar_perplexity_blog:
                     st.info("🌐 Fase 2: Buscando informações atualizadas na web com Perplexity...")
                     
                     consulta_perplexity = f"""
@@ -2450,7 +2466,7 @@ with tab_blog:  # NOVA ABA - precisa adicionar na lista de tabs
                                 "briefing": briefing,
                                 "data_criacao": datetime.datetime.now(),
                                 "modelo": "gemini-2.5-flash",
-                                "perplexity_utilizado": usar_perplexity_blog
+                                "perplexity_utilizado": usar_perplexity_blog if 'usar_perplexity_blog' in locals() else False
                             }
                             collection_posts_rag.insert_one(documento_post)
                         except Exception as e:
@@ -2517,7 +2533,7 @@ with tab_blog:  # NOVA ABA - precisa adicionar na lista de tabs
                         
                         # Preparar contexto para ajuste
                         contexto_agente = ""
-                        if usar_contexto_agente_blog and st.session_state.agente_selecionado:
+                        if 'usar_contexto_agente_blog' in locals() and usar_contexto_agente_blog and st.session_state.agente_selecionado:
                             agente = st.session_state.agente_selecionado
                             contexto_agente = construir_contexto(agente, st.session_state.segmentos_selecionados)
                         
