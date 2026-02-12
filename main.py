@@ -1427,560 +1427,1325 @@ Pontos-chave: [lista os principais pontos]""")
             except Exception as e:
                 st.warning(f"Erro ao carregar histórico: {str(e)}")
 
-# ========== ABA: GERAÇÃO DE CONTEÚDO BLOG AGRÍCOLA ==========
-with tab_blog:
-    st.title("🌱 Gerador de Blog Posts Agrícolas")
-    st.markdown("Crie conteúdos especializados para o agronegócio seguindo a estrutura profissional")
-
-    # Conexão com MongoDB
+# ========== ABA: BLOG INTELIGENTE COM RAG TÉCNICO + PERPLEXITY ==========
+with tab_blog:  # NOVA ABA - precisa adicionar na lista de tabs
+    st.header("🌱 Blog Inteligente com RAG Técnico + Perplexity")
+    st.markdown("**Geração de conteúdo agrícola com base na base técnica + busca web com fontes citadas**")
+    
+    # ============================================
+    # 1. INICIALIZAÇÃO E CONFIGURAÇÕES GLOBAIS
+    # ============================================
+    
+    # Conexão com MongoDB específica para blog RAG
     try:
-        client_mongo = MongoClient(mongo_uri)
-        db = client_mongo['blog_posts_agricolas']
-        collection_posts = db['posts_gerados']
-        collection_briefings = db['briefings']
-        collection_kbf = db['kbf_produtos']
-        mongo_connected_blog = True
+        client_blog_rag = MongoClient(mongo_uri)
+        db_blog_rag = client_blog_rag['blog_rag_tecnico']
+        collection_posts_rag = db_blog_rag['posts_rag']
+        collection_analises_rag = db_blog_rag['analises_tecnicas']
+        collection_fontes_rag = db_blog_rag['fontes_perplexity']
+        collection_versoes_rag = db_blog_rag['versoes_ajustes']  # NOVA COLLECTION
+        mongo_connected_blog_rag = True
     except Exception as e:
-        st.error(f"Erro na conexão com MongoDB: {str(e)}")
-        mongo_connected_blog = False
-
-    # Funções para o banco de dados
-    def salvar_post(titulo, cultura, editoria, mes_publicacao, objetivo_post, url, texto_gerado, palavras_chave, palavras_proibidas, tom_voz, estrutura, palavras_contagem, meta_title, meta_descricao, linha_fina, links_internos=None):
-        if mongo_connected_blog:
-            documento = {
-                "id": str(uuid.uuid4()),
-                "titulo": titulo,
-                "cultura": cultura,
-                "editoria": editoria,
-                "mes_publicacao": mes_publicacao,
-                "objetivo_post": objetivo_post,
-                "url": url,
-                "texto_gerado": texto_gerado,
-                "palavras_chave": palavras_chave,
-                "palavras_proibidas": palavras_proibidas,
-                "tom_voz": tom_voz,
-                "estrutura": estrutura,
-                "palavras_contagem": palavras_contagem,
-                "meta_title": meta_title,
-                "meta_descricao": meta_descricao,
-                "linha_fina": linha_fina,
-                "links_internos": links_internos or [],
-                "versao": "2.1"  # Atualizado para versão 2.1
+        st.error(f"❌ Erro na conexão com MongoDB: {str(e)}")
+        mongo_connected_blog_rag = False
+    
+    # ============================================
+    # 2. ESTADO DA SESSÃO - EXPANDIDO
+    # ============================================
+    
+    if 'rag_context_blog' not in st.session_state:
+        st.session_state.rag_context_blog = None
+    if 'analise_tecnica_blog' not in st.session_state:
+        st.session_state.analise_tecnica_blog = None
+    if 'documentos_recuperados_blog' not in st.session_state:
+        st.session_state.documentos_recuperados_blog = []
+    if 'fontes_perplexity_blog' not in st.session_state:
+        st.session_state.fontes_perplexity_blog = []
+    if 'conteudo_gerado_rag' not in st.session_state:
+        st.session_state.conteudo_gerado_rag = None
+    if 'relatorio_fontes_blog' not in st.session_state:
+        st.session_state.relatorio_fontes_blog = None
+    if 'briefing_atual' not in st.session_state:
+        st.session_state.briefing_atual = None
+    if 'historico_ajustes' not in st.session_state:
+        st.session_state.historico_ajustes = []  # LISTA DE AJUSTES REALIZADOS
+    if 'versoes_conteudo' not in st.session_state:
+        st.session_state.versoes_conteudo = []  # VERSÕES ANTERIORES
+    
+    # ============================================
+    # 3. LAYOUT PRINCIPAL - COLUNAS
+    # ============================================
+    
+    col_inputs, col_rag = st.columns([1.2, 0.8])
+    
+    with col_inputs:
+        st.subheader("📋 Briefing do Conteúdo")
+        
+        # === INFORMAÇÕES BÁSICAS ===
+        with st.expander("📌 Informações Básicas", expanded=True):
+            titulo_blog_rag = st.text_input(
+                "Título do post:",
+                placeholder="Ex: Manejo integrado de nematoides na cultura da soja",
+                key="titulo_blog_rag"
+            )
+            
+            cultura_blog_rag = st.text_input(
+                "Cultura alvo:",
+                placeholder="Ex: Soja, Milho, Algodão, Cana",
+                key="cultura_blog_rag"
+            )
+            
+            objetivo_blog_rag = st.text_area(
+                "Objetivo do conteúdo:",
+                placeholder="Ex: Educar o produtor sobre a importância do tratamento de sementes",
+                height=80,
+                key="objetivo_blog_rag"
+            )
+        
+        # === ESPECIFICAÇÕES TÉCNICAS ===
+        with st.expander("🔬 Especificações Técnicas", expanded=True):
+            problema_principal = st.text_area(
+                "Problema/Desafio agrícola:",
+                placeholder="Ex: Aumento da população de nematoides em solos com palhada de milho",
+                height=80,
+                key="problema_rag"
+            )
+            
+            pragas_alvo = st.text_input(
+                "Pragas/Doenças/Patógenos:",
+                placeholder="Ex: Meloidogyne incognita, Heterodera glycines, Phakopsora pachyrhizi",
+                key="pragas_rag"
+            )
+            
+            solucao_produto = st.text_input(
+                "Produto/Solução técnica:",
+                placeholder="Ex: NemaControl, Elestal Neo, Fortenza",
+                key="solucao_rag"
+            )
+            
+            principios_ativos = st.text_input(
+                "Princípios ativos/Diferenciais:",
+                placeholder="Ex: Bionematicida, fungicida sistêmico, bioativador",
+                key="principios_rag"
+            )
+            
+            informacoes_adicionais = st.text_area(
+                "Informações técnicas adicionais:",
+                placeholder="Ex: Dados de eficácia, recomendações de aplicação, resultados de pesquisa",
+                height=80,
+                key="info_adicional_rag"
+            )
+        
+        # === CONFIGURAÇÕES DE ESTILO ===
+        with st.expander("🎨 Estilo e Formatação", expanded=False):
+            col_est1, col_est2 = st.columns(2)
+            
+            with col_est1:
+                tom_voz_blog_rag = st.selectbox(
+                    "Tom de voz:",
+                    ["Técnico-científico com citações", "Jornalístico com fontes", 
+                     "Educativo com referências", "Consultivo técnico", "Acadêmico"],
+                    key="tom_blog_rag"
+                )
+                
+                nivel_tecnico_blog = st.select_slider(
+                    "Nível técnico:",
+                    options=["Básico", "Intermediário", "Avançado", "Especializado"],
+                    value="Intermediário",
+                    key="nivel_blog_rag"
+                )
+            
+            with col_est2:
+                numero_palavras_blog = st.number_input(
+                    "Número de palavras:",
+                    min_value=500,
+                    max_value=3500,
+                    value=1500,
+                    step=100,
+                    key="palavras_blog_rag"
+                )
+                
+                estrutura_post = st.multiselect(
+                    "Seções obrigatórias:",
+                    ["Introdução com contexto", "Fundamentação Técnica", "Evidências Científicas",
+                     "Solução/Aplicação", "Resultados e Benefícios", "Recomendações Práticas",
+                     "Considerações Finais", "Referências e Fontes"],
+                    default=["Introdução com contexto", "Fundamentação Técnica", "Evidências Científicas",
+                            "Solução/Aplicação", "Resultados e Benefícios", "Recomendações Práticas",
+                            "Referências e Fontes"],
+                    key="estrutura_blog_rag"
+                )
+        
+        # === RESTRIÇÕES E FILTROS ===
+        with st.expander("🚫 Restrições e Palavras Proibidas", expanded=False):
+            palavras_proibidas_blog = st.text_area(
+                "Palavras proibidas (separadas por vírgula):",
+                value="melhor, número 1, líder, revolucionário, único, exclusivo, milagroso, garantido",
+                key="proibidas_blog_rag",
+                help="Estas palavras serão filtradas do conteúdo gerado"
+            )
+            
+            restricoes_adicionais = st.text_area(
+                "Restrições adicionais:",
+                placeholder="Ex: Não mencionar concorrentes, evitar viés comercial explícito",
+                key="restricoes_blog_rag"
+            )
+    
+    with col_rag:
+        st.subheader("🧠 RAG Técnico + Perplexity")
+        
+        # === SELEÇÃO DE RAGS ESPECIALIZADOS ===
+        st.markdown("**🔍 Selecionar RAGs para consulta:**")
+        
+        rag_taxonomia_blog = st.checkbox(
+            "RAG Taxonomia Fitopatológica", 
+            value=True,
+            help="Busca específica por classificação de patógenos, nomenclatura científica"
+        )
+        
+        rag_epidemiologia_blog = st.checkbox(
+            "RAG Epidemiologia", 
+            value=True,
+            help="Condições ambientais, temperaturas, umidade, períodos de molhamento"
+        )
+        
+        rag_produtos_blog = st.checkbox(
+            "RAG Produtos e Soluções", 
+            value=True,
+            help="Modo de ação, eficácia, recomendações técnicas, doses"
+        )
+        
+        rag_praticas_blog = st.checkbox(
+            "RAG Práticas Agrícolas", 
+            value=True,
+            help="Manejo integrado, boas práticas, recomendações técnicas"
+        )
+        
+        rag_geral_blog = st.checkbox(
+            "RAG Geral (similaridade)", 
+            value=True,
+            help="Busca geral por similaridade semântica"
+        )
+        
+        st.markdown("---")
+        
+        # === CONFIGURAÇÕES DA BUSCA ===
+        st.markdown("**⚙️ Configurações da Busca**")
+        
+        numero_documentos = st.slider(
+            "Número de documentos por RAG:",
+            min_value=3,
+            max_value=20,
+            value=10,
+            step=1,
+            key="num_docs_blog_rag",
+            help="Quantidade de documentos recuperados por cada RAG especializado"
+        )
+        
+        # === CONFIGURAÇÕES PERPLEXITY ===
+        st.markdown("**🌐 Busca Web com Perplexity**")
+        
+        usar_perplexity_blog = st.checkbox(
+            "Ativar busca Perplexity para informações atualizadas",
+            value=True,
+            key="perplexity_blog_rag",
+            help="Busca dados atualizados na web com fontes citadas"
+        )
+        
+        if usar_perplexity_blog:
+            profundidade_busca = st.select_slider(
+                "Profundidade da busca Perplexity:",
+                options=["Básica", "Moderada", "Avançada", "Exaustiva"],
+                value="Avançada",
+                key="profundidade_perplexity"
+            )
+            
+            incluir_estatisticas = st.checkbox(
+                "Buscar estatísticas e dados numéricos",
+                value=True,
+                key="estatisticas_perplexity"
+            )
+            
+            incluir_pesquisas_recentes = st.checkbox(
+                "Buscar pesquisas científicas recentes (últimos 2 anos)",
+                value=True,
+                key="pesquisas_perplexity"
+            )
+        
+        st.markdown("---")
+        
+        # === VISUALIZAÇÃO DO CONTEXTO RAG ===
+        if st.session_state.documentos_recuperados_blog:
+            st.markdown("**📚 Documentos da Base Técnica**")
+            st.info(f"Total: {len(st.session_state.documentos_recuperados_blog)} documentos")
+        
+        if st.session_state.fontes_perplexity_blog:
+            st.markdown("**🌐 Fontes da Web**")
+            st.success(f"Total: {len(st.session_state.fontes_perplexity_blog)} fontes")
+    
+    # ============================================
+    # 4. FUNÇÕES DE RAG ESPECIALIZADAS
+    # ============================================
+    
+    def buscar_rag_taxonomia_blog(texto_busca: str, limite: int = 10) -> List[Dict]:
+        """RAG especializado em taxonomia e classificação"""
+        perguntas_taxonomia = [
+            f"classificação taxonômica {texto_busca[:100]}",
+            f"nome científico {texto_busca[:100]}",
+            f"agente causal {texto_busca[:100]}",
+            f"taxonomia fitopatologia {texto_busca[:100]}",
+            f"oomiceto fungo diferença {texto_busca[:100]}",
+            f"classificação patógeno {texto_busca[:100]}"
+        ]
+        
+        documentos = []
+        for pergunta in perguntas_taxonomia:
+            embedding = get_embedding(pergunta)
+            docs = astra_client.vector_search(ASTRA_DB_COLLECTION, embedding, limit=limite//3)
+            documentos.extend(docs)
+        
+        # Remover duplicados
+        documentos_unicos = []
+        ids_vistos = set()
+        for doc in documentos:
+            doc_id = str(doc.get('_id', ''))
+            if doc_id not in ids_vistos:
+                documentos_unicos.append(doc)
+                ids_vistos.add(doc_id)
+        
+        return documentos_unicos[:limite]
+    
+    def buscar_rag_epidemiologia_blog(texto_busca: str, limite: int = 10) -> List[Dict]:
+        """RAG especializado em condições epidemiológicas"""
+        perguntas_epidemio = [
+            f"condições ambientais {texto_busca[:100]}",
+            f"temperatura umidade infecção {texto_busca[:100]}",
+            f"período molhamento foliar {texto_busca[:100]}",
+            f"epidemiologia {texto_busca[:100]}",
+            f"condições favoráveis {texto_busca[:100]}"
+        ]
+        
+        documentos = []
+        for pergunta in perguntas_epidemio:
+            embedding = get_embedding(pergunta)
+            docs = astra_client.vector_search(ASTRA_DB_COLLECTION, embedding, limit=limite//3)
+            documentos.extend(docs)
+        
+        documentos_unicos = []
+        ids_vistos = set()
+        for doc in documentos:
+            doc_id = str(doc.get('_id', ''))
+            if doc_id not in ids_vistos:
+                documentos_unicos.append(doc)
+                ids_vistos.add(doc_id)
+        
+        return documentos_unicos[:limite]
+    
+    def buscar_rag_produtos_blog(texto_busca: str, limite: int = 10) -> List[Dict]:
+        """RAG especializado em produtos e soluções"""
+        perguntas_produtos = [
+            f"modo de ação {texto_busca[:100]}",
+            f"eficácia controle {texto_busca[:100]}",
+            f"recomendações técnicas {texto_busca[:100]}",
+            f"aplicação dose {texto_busca[:100]}",
+            f"benefícios produto {texto_busca[:100]}"
+        ]
+        
+        documentos = []
+        for pergunta in perguntas_produtos:
+            embedding = get_embedding(pergunta)
+            docs = astra_client.vector_search(ASTRA_DB_COLLECTION, embedding, limit=limite//3)
+            documentos.extend(docs)
+        
+        documentos_unicos = []
+        ids_vistos = set()
+        for doc in documentos:
+            doc_id = str(doc.get('_id', ''))
+            if doc_id not in ids_vistos:
+                documentos_unicos.append(doc)
+                ids_vistos.add(doc_id)
+        
+        return documentos_unicos[:limite]
+    
+    def buscar_rag_praticas_blog(texto_busca: str, limite: int = 10) -> List[Dict]:
+        """RAG especializado em práticas agrícolas"""
+        perguntas_praticas = [
+            f"manejo integrado {texto_busca[:100]}",
+            f"boas práticas agrícolas {texto_busca[:100]}",
+            f"recomendações técnicas {texto_busca[:100]}",
+            f"manejo cultural {texto_busca[:100]}",
+            f"estratégias controle {texto_busca[:100]}"
+        ]
+        
+        documentos = []
+        for pergunta in perguntas_praticas:
+            embedding = get_embedding(pergunta)
+            docs = astra_client.vector_search(ASTRA_DB_COLLECTION, embedding, limit=limite//3)
+            documentos.extend(docs)
+        
+        documentos_unicos = []
+        ids_vistos = set()
+        for doc in documentos:
+            doc_id = str(doc.get('_id', ''))
+            if doc_id not in ids_vistos:
+                documentos_unicos.append(doc)
+                ids_vistos.add(doc_id)
+        
+        return documentos_unicos[:limite]
+    
+    def buscar_rag_geral_blog(texto_busca: str, limite: int = 10) -> List[Dict]:
+        """RAG geral por similaridade semântica"""
+        embedding = get_embedding(texto_busca[:500])
+        documentos = astra_client.vector_search(ASTRA_DB_COLLECTION, embedding, limit=limite)
+        return documentos
+    
+    # ============================================
+    # 5. FUNÇÃO DE BUSCA PERPLEXITY COM FONTES
+    # ============================================
+    
+    def buscar_perplexity_com_fontes(consulta: str, profundidade: str = "Avançada") -> Dict:
+        """Realiza busca no Perplexity e retorna resultados com fontes citadas"""
+        try:
+            from perplexity import Perplexity
+            
+            perp_api_key = os.getenv("PERP_API_KEY")
+            if not perp_api_key:
+                return {
+                    "erro": "PERP_API_KEY não encontrada",
+                    "resultado": None,
+                    "fontes": []
+                }
+            
+            client = Perplexity(api_key=perp_api_key)
+            
+            # Ajustar prompt conforme profundidade
+            if profundidade == "Básica":
+                prompt_busca = f"""
+                Busque informações técnicas sobre: {consulta}
+                FORMATO OBRIGATÓRIO:
+                1. Informação principal
+                2. Fonte: [URL ou referência]
+                """
+            elif profundidade == "Moderada":
+                prompt_busca = f"""
+                Busque informações técnicas detalhadas sobre: {consulta}
+                
+                PARA CADA INFORMAÇÃO, FORNECER:
+                - Dado/Informação técnica
+                - Fonte específica (URL, instituição, artigo, ano)
+                - Contexto de aplicação
+                
+                PRIORIDADE: Embrapa, universidades, artigos científicos, órgãos oficiais
+                """
+            elif profundidade == "Avançada":
+                prompt_busca = f"""
+                REALIZE UMA BUSCA TÉCNICA COMPLETA SOBRE: {consulta}
+                
+                REQUISITOS OBRIGATÓRIOS:
+                
+                1. DADOS TÉCNICOS ESPECÍFICOS:
+                   - Parâmetros exatos (temperaturas, umidades, doses)
+                   - Estatísticas e números concretos
+                   - Resultados de pesquisa com percentuais
+                
+                2. FONTES CITADAS PARA CADA DADO:
+                   - Instituição/órgão (Embrapa, universidades, centros de pesquisa)
+                   - Ano da publicação/pesquisa
+                   - URL ou referência completa
+                   - Título do estudo/artigo quando disponível
+                
+                3. INFORMAÇÕES ATUALIZADAS:
+                   - Priorizar últimos 2-3 anos
+                   - Destacar novidades/pesquisas recentes
+                
+                FORMATAÇÃO EXIGIDA:
+                
+                ## INFORMAÇÕES TÉCNICAS
+                
+                ### [Tópico 1]
+                - Informação: [dado técnico]
+                - Fonte: [instituição, ano]
+                - Link/Referência: [URL]
+                
+                ### [Tópico 2]
+                ...
+                """
+            else:  # Exaustiva
+                prompt_busca = f"""
+                PESQUISA EXAUSTIVA SOBRE: {consulta}
+                
+                ESCOPO COMPLETO:
+                1. Artigos científicos (últimos 5 anos)
+                2. Boletins técnicos da Embrapa
+                3. Recomendações de universidades (ESALQ, UFV, UFRGS, etc.)
+                4. Dados de institutos de pesquisa (IAC, IAPAR, etc.)
+                5. Estatísticas oficiais (CONAB, IBGE)
+                
+                PARA CADA FONTE:
+                📌 INFORMAÇÃO: [dado completo]
+                🏛️ INSTITUIÇÃO: [nome]
+                📅 ANO: [ano]
+                🔗 URL: [link completo]
+                📊 RELEVÂNCIA: [alta/média/baixa]
+                
+                MÍNIMO DE 10 FONTES DIFERENTES.
+                """
+            
+            response = client.chat.completions.create(
+                model="sonar",
+                messages=[{"role": "user", "content": prompt_busca}],
+                temperature=0.0,
+                max_tokens=30000
+            )
+            
+            if response and response.choices:
+                resultado = response.choices[0].message.content
+                
+                # Extrair fontes do resultado
+                fontes_extraidas = []
+                linhas = resultado.split('\n')
+                
+                for linha in linhas:
+                    linha_lower = linha.lower()
+                    if 'http://' in linha or 'https://' in linha:
+                        import re
+                        urls = re.findall(r'(https?://[^\s\)]+)', linha)
+                        fontes_extraidas.extend(urls)
+                    elif 'fonte:' in linha_lower or 'link:' in linha_lower:
+                        fontes_extraidas.append(linha.strip())
+                    elif 'embrapa' in linha_lower or 'esalq' in linha_lower or 'ufv' in linha_lower:
+                        fontes_extraidas.append(linha.strip())
+                
+                return {
+                    "erro": None,
+                    "resultado": resultado,
+                    "fontes": list(set(fontes_extraidas))[:20]
+                }
+            else:
+                return {
+                    "erro": "Sem resposta do Perplexity",
+                    "resultado": None,
+                    "fontes": []
+                }
+                
+        except ImportError as e:
+            return {
+                "erro": f"Erro de importação: {str(e)}",
+                "resultado": None,
+                "fontes": []
             }
-            collection_posts.insert_one(documento)
-            return True
-        return False
-
-    def carregar_kbf_produtos():
-        if mongo_connected_blog:
-            try:
-                kbf_docs = list(collection_kbf.find({}))
-                return kbf_docs
-            except:
-                return []
-        return []
-
-    def salvar_briefing(briefing_data):
-        if mongo_connected_blog:
-            documento = {
-                "id": str(uuid.uuid4()),
-                "briefing": briefing_data,
+        except Exception as e:
+            return {
+                "erro": f"Erro na busca: {str(e)}",
+                "resultado": None,
+                "fontes": []
             }
-            collection_briefings.insert_one(documento)
-            return True
-        return False
+    
+    # ============================================
+    # 6. FUNÇÃO DE CONSOLIDAÇÃO DE RAGS
+    # ============================================
+    
+    def consolidar_rags_blog(texto_busca: str, rags_ativos: dict, limite: int = 10) -> Dict:
+        """Executa todos os RAGs ativos e consolida resultados"""
+        resultados = {
+            "documentos": [],
+            "contexto": "",
+            "estatisticas": {}
+        }
+        
+        todos_documentos = []
+        
+        if rags_ativos.get('taxonomia'):
+            with st.spinner("🔬 Buscando taxonomia..."):
+                docs = buscar_rag_taxonomia_blog(texto_busca, limite)
+                todos_documentos.extend(docs)
+                resultados['estatisticas']['taxonomia'] = len(docs)
+        
+        if rags_ativos.get('epidemiologia'):
+            with st.spinner("🌡️ Buscando epidemiologia..."):
+                docs = buscar_rag_epidemiologia_blog(texto_busca, limite)
+                todos_documentos.extend(docs)
+                resultados['estatisticas']['epidemiologia'] = len(docs)
+        
+        if rags_ativos.get('produtos'):
+            with st.spinner("🧪 Buscando produtos..."):
+                docs = buscar_rag_produtos_blog(texto_busca, limite)
+                todos_documentos.extend(docs)
+                resultados['estatisticas']['produtos'] = len(docs)
+        
+        if rags_ativos.get('praticas'):
+            with st.spinner("🌱 Buscando práticas agrícolas..."):
+                docs = buscar_rag_praticas_blog(texto_busca, limite)
+                todos_documentos.extend(docs)
+                resultados['estatisticas']['praticas'] = len(docs)
+        
+        if rags_ativos.get('geral'):
+            with st.spinner("📚 Busca geral..."):
+                docs = buscar_rag_geral_blog(texto_busca, limite)
+                todos_documentos.extend(docs)
+                resultados['estatisticas']['geral'] = len(docs)
+        
+        # Remover duplicados
+        documentos_unicos = []
+        ids_vistos = set()
+        for doc in todos_documentos:
+            doc_id = str(doc.get('_id', ''))
+            if doc_id not in ids_vistos:
+                documentos_unicos.append(doc)
+                ids_vistos.add(doc_id)
+        
+        resultados['documentos'] = documentos_unicos
+        
+        # Construir contexto
+        contexto = "## BASE DE CONHECIMENTO TÉCNICO - DOCUMENTOS RECUPERADOS:\n\n"
+        
+        for i, doc in enumerate(documentos_unicos[:30], 1):
+            doc_str = str(doc)
+            doc_clean = doc_str.replace('{', '').replace('}', '').replace("'", "").replace('"', '')
+            contexto += f"--- DOCUMENTO {i} ---\n{doc_clean[:500]}...\n\n"
+        
+        resultados['contexto'] = contexto
+        resultados['total_documentos'] = len(documentos_unicos)
+        
+        return resultados
+    
+    # ============================================
+    # 7. FUNÇÃO DE GERAÇÃO COM RAG + PERPLEXITY
+    # ============================================
+    
+    def gerar_conteudo_com_rag_perplexity(
+        briefing: Dict,
+        contexto_rag: str,
+        resultados_perplexity: Dict,
+        contexto_agente: str = ""
+    ) -> Dict:
+        """Gera conteúdo completo com RAG + Perplexity e cita fontes"""
+        
+        # Processar palavras proibidas
+        palavras_proibidas_lista = [p.strip().lower() for p in briefing['palavras_proibidas'].split(',') if p.strip()]
+        palavras_proibidas_str = ", ".join(palavras_proibidas_lista)
+        
+        # Processar fontes Perplexity
+        fontes_perplexity = ""
+        if resultados_perplexity and resultados_perplexity.get('resultado'):
+            fontes_perplexity = resultados_perplexity['resultado']
+        
+        # Lista de fontes para citação
+        lista_fontes = []
+        if resultados_perplexity and resultados_perplexity.get('fontes'):
+            lista_fontes = resultados_perplexity['fontes']
+        
+        prompt_geracao = f"""
+        {contexto_agente}
+        
+        ## INSTRUÇÕES PARA GERAÇÃO DE CONTEÚDO TÉCNICO AGRÍCOLA COM FONTES CITADAS
+        
+        ### TÍTULO: {briefing['titulo']}
+        ### CULTURA: {briefing['cultura']}
+        ### OBJETIVO: {briefing['objetivo']}
+        
+        ### ESPECIFICAÇÕES TÉCNICAS:
+        - Problema: {briefing['problema']}
+        - Pragas/Patógenos: {briefing['pragas']}
+        - Solução/Produto: {briefing['solucao']}
+        - Princípios ativos: {briefing['principios']}
+        - Informações adicionais: {briefing['info_adicional']}
+        
+        ### CONFIGURAÇÕES DE ESTILO:
+        - Tom de voz: {briefing['tom_voz']}
+        - Nível técnico: {briefing['nivel_tecnico']}
+        - Número de palavras: {briefing['numero_palavras']} (±5%)
+        - Estrutura: {', '.join(briefing['estrutura'])}
+        
+        ### RESTRIÇÕES:
+        - Palavras PROIBIDAS (NÃO USAR EM HIPÓTESE ALGUMA): {palavras_proibidas_str}
+        - Restrições adicionais: {briefing['restricoes']}
+        
+        ---
+        
+        ### BASE TÉCNICA DE REFERÊNCIA (RAG INTERNO):
+        {contexto_rag}
+        
+        ---
+        
+        ### INFORMAÇÕES ATUALIZADAS DA WEB (PERPLEXITY) COM FONTES:
+        {fontes_perplexity}
+        
+        ---
+        
+        ## REGRAS OBRIGATÓRIAS DE FORMATAÇÃO E CONTEÚDO:
+        
+        **1. CITAÇÃO DE FONTES EM TODOS OS DADOS TÉCNICOS:**
+           - TODO dado numérico (temperatura, umidade, dose, percentual) DEVE ter fonte citada
+           - Formato: "[dado] (Fonte: [instituição/estudo, ano])"
+           - Exemplo: "temperatura ideal de 25-30°C (Fonte: Embrapa Soja, 2023)"
+        
+        **2. ESTRUTURA OBRIGATÓRIA:**
+           - Título principal (H1) com palavra-chave
+           - Subtítulos (H2/H3) organizando o conteúdo
+           - Parágrafos curtos (máximo 4-5 linhas)
+           - Listas com bullets para informações concatenadas (máx 5 itens)
+        
+        **3. SEÇÃO DE REFERÊNCIAS:**
+           - Ao final, criar seção "📚 Referências e Fontes"
+           - Listar TODAS as fontes utilizadas com links completos
+           - Formato: 
+             * [Instituição/Órgão] - [Título/Descrição] - [Ano] - [URL]
+        
+        **4. PRECISÃO TÉCNICA OBRIGATÓRIA:**
+           - Nomes científicos em itálico
+           - Termos técnicos em negrito na primeira aparição
+           - Números com unidades corretas (ºC, mm, kg/ha)
+           - Evite generalizações sem respaldo técnico
+        
+        **5. FILTRAGEM DE PALAVRAS PROIBIDAS:**
+           - NÃO use: {palavras_proibidas_str}
+           - Se aparecerem no texto original, substitua ou remova
+        
+        ---
+        
+        ## TAREFA:
+        
+        Gere um conteúdo técnico agrícola completo seguindo:
+        1. ESTRUTURA EXATA solicitada na seção "Estrutura"
+        2. CITE FONTES para CADA dado técnico apresentado
+        3. PRIORIZE as informações do Perplexity para dados atualizados
+        4. COMPLEMENTE com a base RAG para fundamentação técnica
+        5. INCLUA seção de referências com todas as fontes
+        
+        O conteúdo deve ser rico em dados, tecnicamente preciso e com todas as fontes claramente citadas.
+        
+        RETORNE APENAS O CONTEÚDO GERADO, SEM COMENTÁRIOS ADICIONAIS.
+        """
+        
+        try:
+            resposta = modelo_texto.generate_content(prompt_geracao)
+            conteudo = resposta.text
+            
+            # Verificar palavras proibidas
+            palavras_encontradas = []
+            for palavra in palavras_proibidas_lista:
+                if palavra.lower() in conteudo.lower():
+                    palavras_encontradas.append(palavra)
+                    conteudo = conteudo.replace(palavra, f"[{palavra} - FILTRADO]")
+                    conteudo = conteudo.replace(palavra.capitalize(), f"[{palavra.capitalize()} - FILTRADO]")
+            
+            # Construir relatório de fontes
+            relatorio_fontes = "## 📚 RELATÓRIO DE FONTES UTILIZADAS\n\n"
+            relatorio_fontes += "### Fontes da Web (Perplexity):\n"
+            
+            for i, fonte in enumerate(lista_fontes[:20], 1):
+                relatorio_fontes += f"{i}. {fonte}\n"
+            
+            if not lista_fontes:
+                relatorio_fontes += "*Nenhuma fonte web específica foi capturada automaticamente*\n"
+            
+            return {
+                "conteudo": conteudo,
+                "palavras_filtradas": palavras_encontradas,
+                "fontes_utilizadas": lista_fontes,
+                "relatorio_fontes": relatorio_fontes,
+                "sucesso": True,
+                "erro": None
+            }
+            
+        except Exception as e:
+            return {
+                "conteudo": None,
+                "palavras_filtradas": [],
+                "fontes_utilizadas": [],
+                "relatorio_fontes": None,
+                "sucesso": False,
+                "erro": str(e)
+            }
+    
+    # ============================================
+    # 8. NOVA FUNÇÃO: AJUSTE PONTUAL DO CONTEÚDO
+    # ============================================
+    
+    def ajustar_conteudo_pontualmente(
+        conteudo_original: str,
+        solicitacao_ajuste: str,
+        briefing: Dict,
+        contexto_rag: str,
+        resultados_perplexity: Dict,
+        contexto_agente: str = ""
+    ) -> Dict:
+        """
+        REALIZA AJUSTES PONTUAIS NO CONTEÚDO GERADO
+        - Mantém 100% da estrutura original
+        - Altera APENAS o que foi solicitado
+        - Preserva formatação, títulos, fontes
+        """
+        
+        # Processar palavras proibidas
+        palavras_proibidas_lista = [p.strip().lower() for p in briefing['palavras_proibidas'].split(',') if p.strip()]
+        palavras_proibidas_str = ", ".join(palavras_proibidas_lista)
+        
+        # Processar fontes Perplexity
+        fontes_perplexity = ""
+        if resultados_perplexity and resultados_perplexity.get('resultado'):
+            fontes_perplexity = resultados_perplexity['resultado']
+        
+        prompt_ajuste_pontual = f"""
+        {contexto_agente}
+        
+        ## INSTRUÇÕES CRÍTICAS: AJUSTE PONTUAL DE CONTEÚDO
+        ## MANTENHA A ESTRUTURA ORIGINAL - ALTERE APENAS O SOLICITADO
+        
+        --------------------------------------------------------------------
+        
+        ### CONTEÚDO ORIGINAL COMPLETO:
+        
+        {conteudo_original}
+        
+        --------------------------------------------------------------------
+        
+        ### SOLICITAÇÃO ESPECÍFICA DO USUÁRIO:
+        "{solicitacao_ajuste}"
+        
+        --------------------------------------------------------------------
+        
+        ### INFORMAÇÕES DE CONTEXTO (PARA REFERÊNCIA):
+        
+        **CULTURA:** {briefing['cultura']}
+        **PROBLEMA:** {briefing['problema']}
+        **PRAGAS:** {briefing['pragas']}
+        **SOLUÇÃO:** {briefing['solucao']}
+        
+        **BASE TÉCNICA RAG (DOCUMENTOS):**
+        {contexto_rag[:1000]}...
+        
+        **INFORMAÇÕES PERPLEXITY (FONTES):**
+        {fontes_perplexity[:1000]}...
+        
+        --------------------------------------------------------------------
+        
+        ## REGRAS ABSOLUTAS - NÃO VIOLAR:
+        
+        1. **MANTENHA A ESTRUTURA ORIGINAL COMPLETA**
+           - NÃO remova seções
+           - NÃO adicione novas seções
+           - NÃO renomeie títulos
+           - NÃO altere a ordem do conteúdo
+        
+        2. **ALTERE APENAS O ESTRITAMENTE SOLICITADO**
+           - Se o usuário pediu para "adicionar dados sobre X", adicione APENAS essa informação
+           - Se o usuário pediu para "corrigir Y", corrija APENAS Y
+           - Se o usuário pediu para "remover Z", remova APENAS Z
+           - TODO o resto do texto deve permanecer IDÊNTICO
+        
+        3. **PRESERVE FORMATAÇÃO E ESTILO**
+           - Mantenha todos os negritos, itálicos, bullets exatamente iguais
+           - Mantenha as citações de fontes existentes
+           - Mantenha a seção de referências intacta
+        
+        4. **USE AS MESMAS FONTES E REFERÊNCIAS**
+           - Para novos dados adicionados, use fontes do Perplexity
+           - Formato obrigatório: "[dado] (Fonte: [instituição, ano])"
+        
+        5. **FILTRAGEM DE PALAVRAS PROIBIDAS**
+           - NÃO use: {palavras_proibidas_str}
+        
+        --------------------------------------------------------------------
+        
+        ## SUA TAREFA:
+        
+        1. IDENTIFIQUE exatamente o que o usuário quer modificar
+        2. LOCALIZE esse trecho no conteúdo original
+        3. APLIQUE a modificação solicitada com PRECISÃO CIRÚRGICA
+        4. RETORNE O CONTEÚDO COMPLETO com a alteração feita
+        
+        **IMPORTANTE:** O conteúdo retornado deve ser IDÊNTICO ao original, 
+        EXCETO pela modificação pontual solicitada.
+        
+        RETORNE APENAS O CONTEÚDO AJUSTADO, SEM COMENTÁRIOS.
+        """
+        
+        try:
+            resposta = modelo_texto.generate_content(prompt_ajuste_pontual)
+            conteudo_ajustado = resposta.text
+            
+            # Verificar se o conteúdo foi significativamente alterado
+            if len(conteudo_ajustado) < len(conteudo_original) * 0.5:
+                # Provavelmente o modelo não entendeu - retornar original
+                return {
+                    "conteudo": conteudo_original,
+                    "alteracoes_realizadas": ["⚠️ Modelo não conseguiu aplicar ajuste - mantido original"],
+                    "sucesso": False,
+                    "erro": "Ajuste muito agressivo - mantido original"
+                }
+            
+            # Verificar palavras proibidas
+            palavras_encontradas = []
+            for palavra in palavras_proibidas_lista:
+                if palavra.lower() in conteudo_ajustado.lower():
+                    palavras_encontradas.append(palavra)
+                    conteudo_ajustado = conteudo_ajustado.replace(palavra, f"[{palavra} - FILTRADO]")
+                    conteudo_ajustado = conteudo_ajustado.replace(palavra.capitalize(), f"[{palavra.capitalize()} - FILTRADO]")
+            
+            # Identificar mudanças (básico)
+            alteracoes = []
+            if len(conteudo_ajustado) != len(conteudo_original):
+                alteracoes.append(f"📝 Ajuste aplicado: {solicitacao_ajuste[:100]}...")
+            
+            return {
+                "conteudo": conteudo_ajustado,
+                "alteracoes_realizadas": alteracoes,
+                "palavras_filtradas": palavras_encontradas,
+                "sucesso": True,
+                "erro": None
+            }
+            
+        except Exception as e:
+            return {
+                "conteudo": conteudo_original,
+                "alteracoes_realizadas": [],
+                "palavras_filtradas": [],
+                "sucesso": False,
+                "erro": str(e)
+            }
+    
+    # ============================================
+    # 9. BOTÃO PRINCIPAL - PROCESSAMENTO COMPLETO
+    # ============================================
+    
+    st.markdown("---")
+    col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
+    
+    with col_btn2:
+        if st.button("🚀 GERAR CONTEÚDO COM RAG + PERPLEXITY", 
+                    type="primary", 
+                    use_container_width=True,
+                    key="btn_gerar_blog_rag"):
+            
+            # VALIDAÇÃO DE CAMPOS OBRIGATÓRIOS
+            if not titulo_blog_rag:
+                st.error("❌ Título do post é obrigatório")
+                st.stop()
+            if not cultura_blog_rag:
+                st.error("❌ Cultura alvo é obrigatória")
+                st.stop()
+            if not problema_principal:
+                st.error("❌ Problema/Desafio agrícola é obrigatório")
+                st.stop()
+            
+            # INICIAR PROCESSAMENTO
+            with st.spinner("🔄 Iniciando pipeline de geração inteligente..."):
+                
+                # 1. CONSTRUIR BRIEFING
+                briefing = {
+                    "titulo": titulo_blog_rag,
+                    "cultura": cultura_blog_rag,
+                    "objetivo": objetivo_blog_rag,
+                    "problema": problema_principal,
+                    "pragas": pragas_alvo,
+                    "solucao": solucao_produto,
+                    "principios": principios_ativos,
+                    "info_adicional": informacoes_adicionais,
+                    "tom_voz": tom_voz_blog_rag,
+                    "nivel_tecnico": nivel_tecnico_blog,
+                    "numero_palavras": numero_palavras_blog,
+                    "estrutura": estrutura_post,
+                    "palavras_proibidas": palavras_proibidas_blog,
+                    "restricoes": restricoes_adicionais
+                }
+                
+                st.session_state.briefing_atual = briefing
+                
+                # 2. CONTEXTO DO AGENTE
+                contexto_agente = ""
+                if usar_contexto_agente_blog and st.session_state.agente_selecionado:
+                    agente = st.session_state.agente_selecionado
+                    contexto_agente = construir_contexto(agente, st.session_state.segmentos_selecionados)
+                
+                # 3. PROCESSAR RAGS INTERNOS
+                st.info("🔍 Fase 1: Consultando base técnica com RAGs especializados...")
+                
+                rags_ativos = {
+                    'taxonomia': rag_taxonomia_blog,
+                    'epidemiologia': rag_epidemiologia_blog,
+                    'produtos': rag_produtos_blog,
+                    'praticas': rag_praticas_blog,
+                    'geral': rag_geral_blog
+                }
+                
+                if not any(rags_ativos.values()):
+                    st.warning("⚠️ Nenhum RAG selecionado. Ativando RAG Geral para continuar.")
+                    rags_ativos['geral'] = True
+                
+                resultados_rag = consolidar_rags_blog(
+                    f"{problema_principal} {pragas_alvo} {solucao_produto}",
+                    rags_ativos,
+                    numero_documentos
+                )
+                
+                st.session_state.documentos_recuperados_blog = resultados_rag['documentos']
+                st.session_state.rag_context_blog = resultados_rag['contexto']
+                
+                # 4. PROCESSAR PERPLEXITY
+                resultados_perplexity = {"resultado": None, "fontes": [], "erro": None}
+                
+                if usar_perplexity_blog:
+                    st.info("🌐 Fase 2: Buscando informações atualizadas na web com Perplexity...")
+                    
+                    consulta_perplexity = f"""
+                    {problema_principal} na cultura {cultura_blog_rag}
+                    Controle de {pragas_alvo}
+                    {solucao_produto} eficácia e recomendações técnicas
+                    Dados atualizados Embrapa universidades
+                    """
+                    
+                    with st.spinner("Consultando Perplexity - isso pode levar alguns segundos..."):
+                        resultados_perplexity = buscar_perplexity_com_fontes(
+                            consulta_perplexity,
+                            profundidade_busca if 'profundidade_busca' in locals() else "Avançada"
+                        )
+                    
+                    if resultados_perplexity.get('erro'):
+                        st.warning(f"⚠️ Busca Perplexity: {resultados_perplexity['erro']}")
+                    else:
+                        fontes_count = len(resultados_perplexity.get('fontes', []))
+                        st.success(f"✅ Perplexity concluído - {fontes_count} fontes encontradas")
+                        st.session_state.fontes_perplexity_blog = resultados_perplexity.get('fontes', [])
+                
+                # 5. GERAR CONTEÚDO COM RAG + PERPLEXITY
+                st.info("✍️ Fase 3: Gerando conteúdo com RAG + Perplexity...")
+                
+                with st.spinner("Gerando conteúdo técnico com citação de fontes..."):
+                    resultado_geracao = gerar_conteudo_com_rag_perplexity(
+                        briefing,
+                        resultados_rag['contexto'],
+                        resultados_perplexity,
+                        contexto_agente
+                    )
+                
+                # 6. SALVAR NO SESSION STATE
+                if resultado_geracao['sucesso']:
+                    st.session_state.conteudo_gerado_rag = resultado_geracao['conteudo']
+                    st.session_state.relatorio_fontes_blog = resultado_geracao['relatorio_fontes']
+                    st.session_state.ultimas_palavras_filtradas = resultado_geracao['palavras_filtradas']
+                    
+                    # Salvar primeira versão
+                    st.session_state.versoes_conteudo = [{
+                        "versao": 1,
+                        "conteudo": resultado_geracao['conteudo'],
+                        "tipo": "original",
+                        "data": datetime.datetime.now(),
+                        "descricao": "Geração inicial"
+                    }]
+                    
+                    st.session_state.historico_ajustes = []
+                    
+                    # 7. SALVAR NO MONGODB
+                    if mongo_connected_blog_rag:
+                        try:
+                            documento_post = {
+                                "titulo": titulo_blog_rag,
+                                "cultura": cultura_blog_rag,
+                                "conteudo": resultado_geracao['conteudo'],
+                                "fontes": st.session_state.fontes_perplexity_blog,
+                                "documentos_rag": len(st.session_state.documentos_recuperados_blog),
+                                "palavras_filtradas": resultado_geracao['palavras_filtradas'],
+                                "briefing": briefing,
+                                "data_criacao": datetime.datetime.now(),
+                                "modelo": "gemini-2.5-flash",
+                                "perplexity_utilizado": usar_perplexity_blog
+                            }
+                            collection_posts_rag.insert_one(documento_post)
+                        except Exception as e:
+                            st.warning(f"⚠️ Conteúdo gerado mas não salvo no banco: {str(e)}")
+                    
+                    st.success("✅ Conteúdo gerado com sucesso!")
+                    
+                else:
+                    st.error(f"❌ Erro na geração: {resultado_geracao['erro']}")
+    
+    # ============================================
+    # 10. EXIBIÇÃO DOS RESULTADOS + SEÇÃO DE AJUSTES
+    # ============================================
+    
+    if st.session_state.conteudo_gerado_rag:
+        st.markdown("---")
+        
+        # MÉTRICAS
+        col_metric1, col_metric2, col_metric3, col_metric4 = st.columns(4)
+        
+        with col_metric1:
+            palavras_count = len(st.session_state.conteudo_gerado_rag.split())
+            st.metric("📊 Palavras", f"{palavras_count}")
+        
+        with col_metric2:
+            docs_count = len(st.session_state.documentos_recuperados_blog)
+            st.metric("📚 Documentos RAG", f"{docs_count}")
+        
+        with col_metric3:
+            fontes_count = len(st.session_state.fontes_perplexity_blog)
+            st.metric("🌐 Fontes Web", f"{fontes_count}")
+        
+        with col_metric4:
+            versoes_count = len(st.session_state.versoes_conteudo)
+            st.metric("📋 Versões", f"{versoes_count}")
+        
+        # ========================================
+        # SEÇÃO DE AJUSTES PONTUAIS
+        # ========================================
+        
+        st.markdown("---")
+        st.subheader("🔄 Ajustes Pontuais no Conteúdo")
+        st.markdown("**Mantenha a estrutura original - altere apenas o solicitado**")
+        
+        col_ajuste1, col_ajuste2 = st.columns([3, 1])
+        
+        with col_ajuste1:
+            solicitacao_ajuste = st.text_area(
+                "📝 Descreva o ajuste pontual desejado:",
+                placeholder="Exemplos:\n- Adicione dados sobre temperatura ideal para o fungo (com fonte)\n- Corrija a dose do produto para 0,5 L/ha conforme bula\n- Remova a menção ao concorrente X\n- Adicione um parágrafo sobre rotação de culturas na seção de recomendações\n- Substitua o termo 'fungicida' por 'oomicida' onde aparece",
+                height=100,
+                key="campo_ajuste_pontual"
+            )
+        
+        with col_ajuste2:
+            st.markdown("#####")  # Espaçamento
+            if st.button("✅ APLICAR AJUSTE", 
+                        type="secondary", 
+                        use_container_width=True,
+                        key="btn_aplicar_ajuste"):
+                
+                if solicitacao_ajuste.strip():
+                    with st.spinner("🔄 Aplicando ajuste pontual - preservando estrutura..."):
+                        
+                        # Preparar contexto para ajuste
+                        contexto_agente = ""
+                        if usar_contexto_agente_blog and st.session_state.agente_selecionado:
+                            agente = st.session_state.agente_selecionado
+                            contexto_agente = construir_contexto(agente, st.session_state.segmentos_selecionados)
+                        
+                        # Processar Perplexity novamente se necessário (para dados novos)
+                        resultados_perplexity_ajuste = {
+                            "resultado": st.session_state.relatorio_fontes_blog,
+                            "fontes": st.session_state.fontes_perplexity_blog
+                        }
+                        
+                        # Aplicar ajuste pontual
+                        resultado_ajuste = ajustar_conteudo_pontualmente(
+                            conteudo_original=st.session_state.conteudo_gerado_rag,
+                            solicitacao_ajuste=solicitacao_ajuste,
+                            briefing=st.session_state.briefing_atual,
+                            contexto_rag=st.session_state.rag_context_blog,
+                            resultados_perplexity=resultados_perplexity_ajuste,
+                            contexto_agente=contexto_agente
+                        )
+                        
+                        if resultado_ajuste['sucesso']:
+                            # Salvar versão anterior no histórico
+                            versao_anterior = {
+                                "versao": len(st.session_state.versoes_conteudo) + 1,
+                                "conteudo": st.session_state.conteudo_gerado_rag,
+                                "tipo": "ajuste",
+                                "data": datetime.datetime.now(),
+                                "descricao": solicitacao_ajuste[:100] + "...",
+                                "solicitacao": solicitacao_ajuste
+                            }
+                            st.session_state.versoes_conteudo.append(versao_anterior)
+                            
+                            # Atualizar conteúdo atual
+                            st.session_state.conteudo_gerado_rag = resultado_ajuste['conteudo']
+                            
+                            # Registrar no histórico de ajustes
+                            st.session_state.historico_ajustes.append({
+                                "data": datetime.datetime.now(),
+                                "solicitacao": solicitacao_ajuste,
+                                "alteracoes": resultado_ajuste.get('alteracoes_realizadas', []),
+                                "palavras_filtradas": resultado_ajuste.get('palavras_filtradas', [])
+                            })
+                            
+                            st.success("✅ Ajuste aplicado com sucesso! Estrutura original preservada.")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ Erro ao aplicar ajuste: {resultado_ajuste.get('erro', 'Erro desconhecido')}")
+                else:
+                    st.warning("⚠️ Por favor, descreva o ajuste desejado.")
+        
+        # ========================================
+        # VISUALIZAÇÃO DO CONTEÚDO COM ABAS
+        # ========================================
+        
+        tab_conteudo, tab_fontes, tab_rag, tab_versoes, tab_export = st.tabs([
+            "📝 Conteúdo Gerado", 
+            "📚 Referências e Fontes",
+            "🔬 Documentos RAG",
+            "📋 Histórico de Versões",
+            "💾 Exportar"
+        ])
+        
+        with tab_conteudo:
+            st.markdown("### 📄 Conteúdo Completo")
+            st.markdown(st.session_state.conteudo_gerado_rag)
+            
+            # Exibir palavras filtradas se houver
+            if hasattr(st.session_state, 'ultimas_palavras_filtradas') and st.session_state.ultimas_palavras_filtradas:
+                st.info(f"🚫 Palavras filtradas automaticamente: {', '.join(st.session_state.ultimas_palavras_filtradas)}")
+        
+        with tab_fontes:
+            if st.session_state.relatorio_fontes_blog:
+                st.markdown(st.session_state.relatorio_fontes_blog)
+            else:
+                st.info("Nenhum relatório de fontes disponível")
+            
+            if st.session_state.fontes_perplexity_blog:
+                st.markdown("### 🔗 Links das Fontes")
+                for i, fonte in enumerate(st.session_state.fontes_perplexity_blog, 1):
+                    st.write(f"{i}. {fonte}")
+        
+        with tab_rag:
+            st.markdown("### 📄 Documentos Recuperados da Base Técnica")
+            st.info(f"Total: {len(st.session_state.documentos_recuperados_blog)} documentos")
+            
+            for i, doc in enumerate(st.session_state.documentos_recuperados_blog[:10], 1):
+                with st.expander(f"Documento {i}"):
+                    st.json(doc)
+        
+        with tab_versoes:
+            st.markdown("### 📋 Histórico de Versões e Ajustes")
+            
+            if st.session_state.versoes_conteudo:
+                st.info(f"Total de versões: {len(st.session_state.versoes_conteudo)}")
+                
+                for i, versao in enumerate(reversed(st.session_state.versoes_conteudo[-5:])):
+                    with st.expander(f"Versão {versao['versao']} - {versao['data'].strftime('%d/%m/%Y %H:%M:%S') if isinstance(versao['data'], datetime.datetime) else 'Agora'} - {versao['descricao']}"):
+                        st.text_area(
+                            f"Conteúdo da versão {versao['versao']}",
+                            value=versao['conteudo'][:1000] + "..." if len(versao['conteudo']) > 1000 else versao['conteudo'],
+                            height=200,
+                            key=f"versao_{i}"
+                        )
+                        
+                        if st.button(f"Restaurar versão {versao['versao']}", key=f"restore_{i}"):
+                            st.session_state.conteudo_gerado_rag = versao['conteudo']
+                            st.success(f"✅ Versão {versao['versao']} restaurada!")
+                            st.rerun()
+            
+            if st.session_state.historico_ajustes:
+                st.markdown("### 🔧 Histórico de Ajustes Realizados")
+                
+                for i, ajuste in enumerate(reversed(st.session_state.historico_ajustes[-10:])):
+                    with st.expander(f"Ajuste {len(st.session_state.historico_ajustes) - i} - {ajuste['data'].strftime('%d/%m/%Y %H:%M:%S') if isinstance(ajuste['data'], datetime.datetime) else 'Agora'}"):
+                        st.markdown(f"**Solicitação:** {ajuste['solicitacao']}")
+                        if ajuste.get('alteracoes'):
+                            st.markdown("**Alterações realizadas:**")
+                            for alteracao in ajuste['alteracoes']:
+                                st.markdown(f"- {alteracao}")
+                        if ajuste.get('palavras_filtradas'):
+                            st.info(f"🚫 Palavras filtradas: {', '.join(ajuste['palavras_filtradas'])}")
+        
+        with tab_export:
+            st.subheader("💾 Download do Conteúdo")
+            
+            col_exp1, col_exp2 = st.columns(2)
+            
+            with col_exp1:
+                # TXT
+                st.download_button(
+                    "📥 Baixar como TXT",
+                    data=st.session_state.conteudo_gerado_rag,
+                    file_name=f"blog_rag_{cultura_blog_rag if 'cultura_blog_rag' in locals() else 'conteudo'}_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                    mime="text/plain",
+                    use_container_width=True
+                )
+                
+                # Markdown
+                st.download_button(
+                    "📥 Baixar como MD",
+                    data=st.session_state.conteudo_gerado_rag,
+                    file_name=f"blog_rag_{cultura_blog_rag if 'cultura_blog_rag' in locals() else 'conteudo'}_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.md",
+                    mime="text/markdown",
+                    use_container_width=True
+                )
+            
+            with col_exp2:
+                # Relatório de fontes
+                if st.session_state.relatorio_fontes_blog:
+                    st.download_button(
+                        "📥 Baixar Relatório de Fontes",
+                        data=st.session_state.relatorio_fontes_blog,
+                        file_name=f"fontes_blog_rag_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.md",
+                        mime="text/markdown",
+                        use_container_width=True
+                    )
+                
+                # Pacote completo com histórico
+                pacote_completo = f"""# BLOG POST - {st.session_state.briefing_atual.get('titulo', 'Sem título') if st.session_state.briefing_atual else 'Sem título'}
 
-    def carregar_posts_anteriores():
-        if mongo_connected_blog:
-            try:
-                posts = list(collection_posts.find({}).sort("data_criacao", -1).limit(10))
-                return posts
-            except:
-                return []
-        return []
+## METADADOS
+- Cultura: {st.session_state.briefing_atual.get('cultura', 'N/A') if st.session_state.briefing_atual else 'N/A'}
+- Data: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M')}
+- Documentos RAG: {len(st.session_state.documentos_recuperados_blog)}
+- Fontes Web: {len(st.session_state.fontes_perplexity_blog)}
+- Versões geradas: {len(st.session_state.versoes_conteudo)}
+- Ajustes realizados: {len(st.session_state.historico_ajustes)}
 
-    # ASSINATURA PADRÃO E BOX INICIAL
-    ASSINATURA_PADRAO = """
+## CONTEÚDO FINAL
+
+{st.session_state.conteudo_gerado_rag}
+
 ---
 
-**Sobre o Mais Agro**
-O Mais Agro é uma plataforma de conteúdo especializado em agronegócio, trazendo informações técnicas, análises de mercado e soluções inovadoras para produtores rurais e profissionais do setor.
+## RELATÓRIO DE FONTES
 
-📞 **Fale conosco:** [contato@maisagro.com.br](mailto:contato@maisagro.com.br)
-🌐 **Site:** [www.maisagro.com.br](https://www.maisagro.com.br)
-📱 **Redes sociais:** @maisagrooficial
+{st.session_state.relatorio_fontes_blog if st.session_state.relatorio_fontes_blog else "N/A"}
 
-*Este conteúdo foi desenvolvido pela equipe técnica do Mais Agro para apoiar o produtor rural com informações confiáveis e atualizadas.*
+---
+
+## HISTÓRICO DE AJUSTES
+
 """
-
-    BOX_INICIAL = """
-> 📌 **Destaque do Artigo**
-> 
-> *[Este box deve conter um resumo executivo de 2-3 linhas com os pontos mais importantes do artigo, destacando o problema principal e a solução abordada. Exemplo: "Neste artigo você vai entender como o manejo integrado de nematoides pode aumentar em até 30% a produtividade da soja, com estratégias práticas para implementação imediata."]*
-"""
-
-    # Regras base do sistema - ATUALIZADAS COM CORREÇÕES
-    regras_base = '''
-    **REGRAS DE REPLICAÇÃO - ESTRUTURA PROFISSIONAL:**
-
-    **1. ESTRUTURA DO DOCUMENTO:**
-    - Título principal impactante e com chamada para ação (máx 65 caracteres)
-    - BOX INICIAL com resumo executivo (usar template fornecido)
-    - Linha fina resumindo o conteúdo (máx 200 caracteres)
-    - Meta-title otimizado para SEO (máx 60 caracteres)
-    - Meta-descrição atrativa (máx 155 caracteres)
-    - Introdução contextualizando o problema e impacto (EVITAR padrão "cultura X é importante")
-    - Seção de Problema: Detalhamento técnico dos desafios
-    - Seção de Produto/Solução: Informações específicas sobre o produto e sua aplicação
-    - Seção de Benefícios: Vantagens mensuráveis da solução
-    - Seção de Implementação Prática: Como aplicar no campo
-    - ASSINATURA PADRÃO (usar template fornecido)
-
-    **2. LINGUAGEM E TOM:**
-    - {tom_voz}
-    - Linguagem {nivel_tecnico} técnica e profissional
-    - Uso de terminologia específica do agronegócio
-    - Persuasão baseada em benefícios e solução de problemas
-    - Evitar repetição de informações entre seções
-    - NÃO usar "Conclusão" como subtítulo - finalizar com chamada para ação natural
-    - NÃO usar letras maiúsculas em excesso - apenas onde gramaticalmente necessário
-
-    **3. ELEMENTOS TÉCNICOS OBRIGATÓRIOS:**
-    - Nomes científicos entre parênteses quando aplicável
-    - Citação EXPLÍCITA de fontes confiáveis (Embrapa, universidades, etc.) mencionando o órgão/instituição no corpo do texto
-    - Destaque para termos técnicos-chave e nomes de produtos
-    - Descrição detalhada de danos e benefícios
-    - Dados concretos e informações mensuráveis com referências específicas
-
-    **4. FORMATAÇÃO E ESTRUTURA:**
-    - Parágrafos curtos (máximo 4-5 linhas cada)
-    - Listas de tópicos com no máximo 5 itens cada
-    - Evitar blocos extensos de texto
-    - Usar subtítulos para quebrar o conteúdo
-    - NÃO usar os termos "Solução Genérica" e "Solução Específica" nos subtítulos
-
-    **5. RESTRIÇÕES E FILTROS:**
-    - PALAVRAS PROIBIDAS ABSOLUTAS: {palavras_proibidas_efetivas}
-    - NÃO USAR as palavras acima em nenhuma circunstância
-    - Evitar viés comercial explícito
-    - Manter abordagem {abordagem_problema}
-    - Número de palavras: {numero_palavras} (±5%)
-    - NÃO INVENTAR SOLUÇÕES ou informações não fornecidas
-    - Seguir EXATAMENTE o formato e informações do briefing
-    - EVITAR introduções genéricas sobre importância da cultura
-    - Focar em problemas específicos e soluções práticas desde o início
-    '''
-
-    # CONFIGURAÇÕES DO BLOG (agora dentro da aba)
-    st.header("📋 Configurações do Blog Agrícola")
-    
-    col_config1, col_config2 = st.columns(2)
-    
-    with col_config1:
-        # Modo de entrada - Briefing ou Campos Individuais
-        modo_entrada = st.radio("Modo de Entrada:", ["Campos Individuais", "Briefing Completo"])
-        
-        # Controle de palavras - MAIS RESTRITIVO
-        numero_palavras = st.slider("Número de Palavras:", min_value=300, max_value=2500, value=1500, step=100)
-        st.info(f"Meta: {numero_palavras} palavras (±5%)")
-        
-        # Palavras-chave
-        st.subheader("🔑 Palavras-chave")
-        palavra_chave_principal = st.text_input("Palavra-chave Principal:")
-        palavras_chave_secundarias = st.text_area("Palavras-chave Secundárias (separadas por vírgula):")
-        
-        # Configurações de estilo
-        st.subheader("🎨 Configurações de Estilo")
-        tom_voz = st.selectbox("Tom de Voz:", ["Jornalístico", "Especialista Técnico", "Educativo", "Persuasivo"], key = 'uu')
-        nivel_tecnico = st.selectbox("Nível Técnico:", ["Básico", "Intermediário", "Avançado"])
-        abordagem_problema = st.text_area("Aborde o problema de tal forma que:", "seja claro, técnico e focando na solução prática para o produtor")
-    
-    with col_config2:
-        # Restrições - MELHOR CONTROLE DE PALAVRAS PROIBIDAS
-        st.subheader("🚫 Restrições")
-        palavras_proibidas_input = st.text_area("Palavras Proibidas (separadas por vírgula):", "melhor, número 1, líder, insuperável, invenção, inventado, solução mágica, revolucionário, único, exclusivo")
-        
-        # Processar palavras proibidas para garantir efetividade
-        palavras_proibidas_lista = [palavra.strip().lower() for palavra in palavras_proibidas_input.split(",") if palavra.strip()]
-        palavras_proibidas_efetivas = ", ".join(palavras_proibidas_lista)
-        
-        if palavras_proibidas_lista:
-            st.info(f"🔒 {len(palavras_proibidas_lista)} palavra(s) proibida(s) serão filtradas")
-        
-        # Estrutura do texto - REMOVIDAS SEÇÕES PROBLEMÁTICAS
-        st.subheader("📐 Estrutura do Texto")
-        estrutura_opcoes = st.multiselect("Seções do Post:", 
-                                         ["Introdução", "Problema/Desafio", "Solução/Produto", 
-                                          "Benefícios", "Implementação Prática", "Considerações Finais", "Fontes"],
-                                         default=["Introdução", "Problema/Desafio", "Solução/Produto", "Benefícios", "Implementação Prática"])
-        
-        # KBF de Produtos
-        st.subheader("📦 KBF de Produtos")
-        kbf_produtos = carregar_kbf_produtos()
-        if kbf_produtos:
-            produtos_disponiveis = [prod['nome'] for prod in kbf_produtos]
-            produto_selecionado = st.selectbox("Selecionar Produto do KBF:", ["Nenhum"] + produtos_disponiveis)
-            if produto_selecionado != "Nenhum":
-                produto_info = next((prod for prod in kbf_produtos if prod['nome'] == produto_selecionado), None)
-                if produto_info:
-                    st.info(f"**KBF Fixo:** {produto_info.get('caracteristicas', 'Informações do produto')}")
-        else:
-            st.info("Nenhum KBF cadastrado no banco de dados")
-
-    # Área principal baseada no modo de entrada
-    if modo_entrada == "Campos Individuais":
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.header("📝 Informações Básicas")
-            titulo_blog = st.text_input("Título do Blog:", "Proteja sua soja de nematoides e pragas de solo")
-            cultura = st.text_input("Cultura:", "Soja")
-            editoria = st.text_input("Editoria:", "Manejo e Proteção")
-            mes_publicacao = st.text_input("Mês de Publicação:", "08/2025")
-            objetivo_post = st.text_area("Objetivo do Post:", "Explicar a importância do manejo de nematoides e apresentar soluções via tratamento de sementes")
-            url = st.text_input("URL:", "/manejo-e-protecao/proteja-sua-soja-de-nematoides")
-            
-            st.header("🔧 Conteúdo Técnico")
-            problema_principal = st.text_area("Problema Principal/Contexto:", "Solos compactados e com palhada de milho têm favorecido a explosão populacional de nematoides")
-            pragas_alvo = st.text_area("Pragas/Alvo Principal:", "Nematoide das galhas (Meloidogyne incognita), Nematoide de cisto (Heterodera glycines)")
-            danos_causados = st.text_area("Danos Causados:", "Formação de galhas nas raízes que impedem a absorção de água e nutrientes")
-        
-        with col2:
-            st.header("🏭 Informações da Empresa")
-            nome_empresa = st.text_input("Nome da Empresa/Marca:")
-            nome_central = st.text_input("Nome da Central de Conteúdos:")
-            
-            st.header("💡 Soluções e Produtos")
-            nome_produto = st.text_input("Nome do Produto:")
-            principio_ativo = st.text_input("Princípio Ativo/Diferencial:")
-            beneficios_produto = st.text_area("Benefícios do Produto:")
-            espectro_acao = st.text_area("Espectro de Ação:")
-            modo_acao = st.text_area("Modo de Ação:")
-            aplicacao_pratica = st.text_area("Aplicação Prática:")
-            
-            st.header("🎯 Diretrizes Específicas")
-            diretrizes_usuario = st.text_area("Diretrizes Adicionais:", 
-                                            "NÃO INVENTE SOLUÇÕES. Use apenas informações fornecidas. Incluir dicas práticas para implementação no campo. Manter linguagem acessível mas técnica. EVITAR introduções genéricas sobre importância da cultura.")
-            fontes_pesquisa = st.text_area("Fontes para Pesquisa/Referência (cite órgãos específicos):", 
-                                         "Embrapa Soja, Universidade de São Paulo - ESALQ, Instituto Biológico de São Paulo, Artigos técnicos sobre nematoides")
-            
-            # Upload de MÚLTIPLOS arquivos estratégicos
-            arquivos_estrategicos = st.file_uploader("📎 Upload de Múltiplos Arquivos Estratégicos", 
-                                                   type=['txt', 'pdf', 'docx', 'mp3', 'wav', 'mp4', 'mov'], 
-                                                   accept_multiple_files=True)
-            if arquivos_estrategicos:
-                st.success(f"{len(arquivos_estrategicos)} arquivo(s) carregado(s) com sucesso!")
-    
-    else:  # Modo Briefing
-        st.header("📄 Briefing Completo")
-        
-        st.warning("""
-        **ATENÇÃO:** Para conteúdos técnicos complexos (especialmente Syngenta), 
-        recomenda-se usar o modo "Campos Individuais" para melhor controle da qualidade.
-        """)
-        
-        briefing_texto = st.text_area("Cole aqui o briefing completo:", height=300,
-                                     placeholder="""EXEMPLO DE BRIEFING:
-Título: Controle Eficiente de Nematoides na Soja
-Cultura: Soja
-Problema: Aumento da população de nematoides em solos com palhada de milho
-Objetivo: Educar produtores sobre manejo integrado
-Produto: NemaControl
-Público-alvo: Produtores de soja técnica
-Tom: Técnico-jornalístico
-Palavras-chave: nematoide, soja, tratamento sementes, manejo integrado
-
-IMPORTANTE: NÃO INVENTE SOLUÇÕES. Use apenas informações fornecidas aqui.""")
-        
-        if briefing_texto:
-            if st.button("Processar Briefing"):
-                salvar_briefing(briefing_texto)
-                st.success("Briefing salvo no banco de dados!")
-
-    # NOVO CAMPO: LINKS INTERNOS
-    st.header("🔗 Links Internos")
-    st.info("Adicione links internos que serão automaticamente inseridos no corpo do texto como âncoras")
-    
-    links_internos = []
-    num_links = st.number_input("Número de links internos a adicionar:", min_value=0, max_value=10, value=0)
-    
-    for i in range(num_links):
-        col_link1, col_link2 = st.columns([3, 1])
-        with col_link1:
-            texto_ancora = st.text_input(f"Texto âncora {i+1}:", placeholder="Ex: manejo integrado de pragas")
-            url_link = st.text_input(f"URL do link {i+1}:", placeholder="Ex: /blog/manejo-integrado-pragas")
-        with col_link2:
-            posicao = st.selectbox(f"Posição {i+1}:", ["Automática", "Introdução", "Problema", "Solução", "Benefícios", "Implementação"])
-        
-        if texto_ancora and url_link:
-            links_internos.append({
-                "texto_ancora": texto_ancora,
-                "url": url_link,
-                "posicao": posicao
-            })
-    
-    if links_internos:
-        st.success(f"✅ {len(links_internos)} link(s) interno(s) configurado(s)")
-
-    # Configurações avançadas
-    with st.expander("⚙️ Configurações Avançadas"):
-        col_av1, col_av2 = st.columns(2)
-        
-        with col_av1:
-            st.subheader("Opcionais")
-            usar_pesquisa_web = st.checkbox("🔍 Habilitar Pesquisa Web", value=False)
-            gerar_blocos_dinamicos = st.checkbox("🔄 Gerar Blocos Dinamicamente", value=True)
-            incluir_fontes = st.checkbox("📚 Incluir Referências de Fontes", value=True)
-            incluir_assinatura = st.checkbox("✍️ Incluir Assinatura Padrão", value=True, help="Assinatura padrão do Mais Agro será incluída automaticamente")
-            incluir_box_inicial = st.checkbox("📌 Incluir Box Inicial", value=True, help="Box de destaque no início do artigo")
-            
-        with col_av2:
-            st.subheader("Controles de Qualidade")
-            evitar_repeticao = st.slider("Nível de Evitar Repetição:", 1, 10, 8)
-            profundidade_conteudo = st.selectbox("Profundidade do Conteúdo:", ["Superficial", "Moderado", "Detalhado", "Especializado"])
-            
-            # Configurações de formatação
-            st.subheader("📐 Formatação")
-            max_paragrafos = st.slider("Máximo de linhas por parágrafo:", 3, 8, 5)
-            max_lista_itens = st.slider("Máximo de itens por lista:", 3, 8, 5)
-            
-            # MÚLTIPLOS arquivos para transcrição
-            st.subheader("🎤 Transcrição de Mídia")
-            arquivos_midia = st.file_uploader("Áudios/Vídeos para Transcrição (múltiplos)", 
-                                            type=['mp3', 'wav', 'mp4', 'mov'], 
-                                            accept_multiple_files=True)
-            
-            if arquivos_midia:
-                st.info(f"{len(arquivos_midia)} arquivo(s) de mídia carregado(s)")
-                if st.button("🎬 Transcrever Mídia"):
-                    with st.spinner("Transcrevendo arquivos de mídia..."):
-                        for arquivo in arquivos_midia:
-                            tipo = "audio" if arquivo.type.startswith('audio') else "video"
-                            transcricao = transcrever_audio_video(arquivo, tipo)
-                            st.write(f"**Transcrição de {arquivo.name}:**")
-                            st.write(transcricao)
-
-    # Metadados para SEO
-    st.header("🔍 Metadados para SEO")
-    col_meta1, col_meta2 = st.columns(2)
-    
-    with col_meta1:
-        meta_title = st.text_input("Meta Title (máx 60 caracteres):", 
-                                 max_chars=60,
-                                 help="Título para SEO - aparecerá nos resultados de busca")
-        st.info(f"Caracteres: {len(meta_title)}/60")
-        
-        linha_fina = st.text_area("Linha Fina (máx 200 caracteres):",
-                                max_chars=200,
-                                help="Resumo executivo que aparece abaixo do título")
-        st.info(f"Caracteres: {len(linha_fina)}/200")
-    
-    with col_meta2:
-        meta_descricao = st.text_area("Meta Descrição (máx 155 caracteres):",
-                                    max_chars=155,
-                                    help="Descrição que aparece nos resultados de busca")
-        st.info(f"Caracteres: {len(meta_descricao)}/155")
-
-    # Área de geração
-    st.header("🔄 Geração do Conteúdo")
-    
-    if st.button("🚀 Gerar Blog Post", type="primary", use_container_width=True):
-        with st.spinner("Gerando conteúdo... Isso pode levar alguns minutos"):
-            try:
-                # Processar transcrições se houver arquivos
-                transcricoes_texto = ""
-                if 'arquivos_midia' in locals() and arquivos_midia:
-                    for arquivo in arquivos_midia:
-                        tipo = "audio" if arquivo.type.startswith('audio') else "video"
-                        transcricao = transcrever_audio_video(arquivo, tipo)
-                        transcricoes_texto += f"\n\n--- TRANSCRIÇÃO DE {arquivo.name} ---\n{transcricao}"
-                    st.info(f"Processadas {len(arquivos_midia)} transcrição(ões)")
-                
-                # Construir prompt personalizado - CORRIGIDO
-                regras_personalizadas = regras_base.format(
-                    tom_voz=tom_voz,
-                    nivel_tecnico=nivel_tecnico,
-                    palavras_proibidas_efetivas=palavras_proibidas_efetivas,
-                    abordagem_problema=abordagem_problema,
-                    numero_palavras=numero_palavras
-                )
-                
-                # Adicionar instruções sobre links internos se houver
-                instrucoes_links = ""
-                if links_internos:
-                    instrucoes_links = "\n\n**INSTRUÇÕES PARA LINKS INTERNOS:**\n"
-                    instrucoes_links += "INSIRA os seguintes links internos DENTRO do texto, como âncoras naturais:\n"
-                    for link in links_internos:
-                        instrucoes_links += f"- [{link['texto_ancora']}]({link['url']}) - Posição: {link['posicao']}\n"
-                    instrucoes_links += "\n**IMPORTANTE:** Insira os links de forma natural no contexto, sem forçar. Use como referência para criar âncoras relevantes."
-                
-                # Instruções específicas para BOX INICIAL e ASSINATURA
-                instrucoes_estrutura = ""
-                if incluir_box_inicial:
-                    instrucoes_estrutura += f"\n\n**BOX INICIAL OBRIGATÓRIO:**\n{BOX_INICIAL}"
-                
-                if incluir_assinatura:
-                    instrucoes_estrutura += f"\n\n**ASSINATURA PADRÃO OBRIGATÓRIA:**\n{ASSINATURA_PADRAO}"
-
-                prompt_final = f"""
-                **INSTRUÇÕES PARA CRIAÇÃO DE BLOG POST AGRÍCOLA:**
-
-                {regras_personalizadas}
-                
-                **INFORMAÇÕES ESPECÍFICAS:**
-                - Título: {titulo_blog if 'titulo_blog' in locals() else 'A definir'}
-                - Cultura: {cultura if 'cultura' in locals() else 'A definir'}
-                - Palavra-chave Principal: {palavra_chave_principal}
-                - Palavras-chave Secundárias: {palavras_chave_secundarias}
-                
-                {instrucoes_links}
-                {instrucoes_estrutura}
-
-                **METADADOS:**
-                - Meta Title: {meta_title}
-                - Meta Description: {meta_descricao}
-                - Linha Fina: {linha_fina}
-                
-                **CONFIGURAÇÕES DE FORMATAÇÃO:**
-                - Parágrafos máximos: {max_paragrafos} linhas
-                - Listas máximas: {max_lista_itens} itens
-                - Estrutura: {', '.join(estrutura_opcoes)}
-                - Profundidade: {profundidade_conteudo}
-                - Evitar repetição: Nível {evitar_repeticao}/10
-                
-                **DIRETRIZES CRÍTICAS:**
-                - NÃO INVENTE SOLUÇÕES OU INFORMAÇÕES
-                - Use APENAS dados fornecidos no briefing
-                - Cite fontes específicas no corpo do texto
-                - Mantenha parágrafos e listas CURTOS
-                - INSIRA OS LINKS INTERNOS de forma natural no texto
-                - EVITE letras maiúsculas em excesso
-                - NÃO USE "Conclusão" como subtítulo
-                - EVITE introduções genéricas sobre importância da cultura
-                - FOCAR em problemas específicos desde o início
-                - FILTRAR as palavras proibidas: {palavras_proibidas_efetivas}
-                
-                **CONTEÚDO DE TRANSCRIÇÕES:**
-                {transcricoes_texto if transcricoes_texto else 'Nenhuma transcrição fornecida'}
-                
-                **INFORMAÇÕES SOBRE PRODUTO:**
-                - Nome do Produto: {nome_produto if 'nome_produto' in locals() else 'Não especificado'}
-                - Princípio Ativo: {principio_ativo if 'principio_ativo' in locals() else 'Não especificado'}
-                - Benefícios: {beneficios_produto if 'beneficios_produto' in locals() else 'Não especificado'}
-                - Modo de Ação: {modo_acao if 'modo_acao' in locals() else 'Não especificado'}
-                - Aplicação Prática: {aplicacao_pratica if 'aplicacao_pratica' in locals() else 'Não especificado'}
-                
-                **DIRETRIZES ADICIONAIS:** {diretrizes_usuario if 'diretrizes_usuario' in locals() else 'Nenhuma'}
-                
-                Gere um conteúdo {profundidade_conteudo.lower()} com EXATAMENTE {numero_palavras} palavras (±5%).
-                """
-                
-                response = modelo_texto.generate_content(prompt_final)
-                
-                texto_gerado = response.text
-                
-                # VERIFICAÇÃO E APLICAÇÃO DE FILTROS
-                # 1. Verificar palavras proibidas
-                palavras_proibidas_encontradas = []
-                for palavra in palavras_proibidas_lista:
-                    if palavra.lower() in texto_gerado.lower():
-                        palavras_proibidas_encontradas.append(palavra)
-                
-                if palavras_proibidas_encontradas:
-                    st.warning(f"⚠️ Palavras proibidas encontradas: {', '.join(palavras_proibidas_encontradas)}")
-                    # Substituir palavras proibidas
-                    for palavra in palavras_proibidas_encontradas:
-                        texto_gerado = texto_gerado.replace(palavra, "[FILTRADO]")
-                        texto_gerado = texto_gerado.replace(palavra.capitalize(), "[FILTRADO]")
-                
-                # 2. Verificar contagem de palavras
-                palavras_count = len(texto_gerado.split())
-                st.info(f"📊 Contagem de palavras geradas: {palavras_count} (meta: {numero_palavras})")
-                
-                if abs(palavras_count - numero_palavras) > numero_palavras * 0.1:
-                    st.warning("⚠️ A contagem de palavras está significativamente diferente da meta")
-                
-                # 3. Verificar estrutura
-                if "Conclusão" in texto_gerado:
-                    st.warning("⚠️ O texto contém 'Conclusão' como subtítulo - isso deve ser evitado")
-                
-                # Salvar no MongoDB
-                if salvar_post(
-                    titulo_blog if 'titulo_blog' in locals() else "Título gerado",
-                    cultura if 'cultura' in locals() else "Cultura não especificada",
-                    editoria if 'editoria' in locals() else "Editoria geral",
-                    mes_publicacao if 'mes_publicacao' in locals() else datetime.datetime.now().strftime("%m/%Y"),
-                    objetivo_post if 'objetivo_post' in locals() else "Objetivo não especificado",
-                    url if 'url' in locals() else "/",
-                    texto_gerado,
-                    f"{palavra_chave_principal}, {palavras_chave_secundarias}",
-                    palavras_proibidas_efetivas,
-                    tom_voz,
-                    ', '.join(estrutura_opcoes),
-                    palavras_count,
-                    meta_title,
-                    meta_descricao,
-                    linha_fina,
-                    links_internos
-                ):
-                    st.success("✅ Post gerado e salvo no banco de dados!")
-                
-                st.subheader("📝 Conteúdo Gerado")
-                st.markdown(texto_gerado)
+                for i, ajuste in enumerate(st.session_state.historico_ajustes, 1):
+                    pacote_completo += f"\n### Ajuste {i}\n"
+                    pacote_completo += f"**Data:** {ajuste['data'].strftime('%d/%m/%Y %H:%M:%S') if isinstance(ajuste['data'], datetime.datetime) else 'Agora'}\n"
+                    pacote_completo += f"**Solicitação:** {ajuste['solicitacao']}\n"
+                    if ajuste.get('alteracoes'):
+                        pacote_completo += "**Alterações:**\n"
+                        for alt in ajuste['alteracoes']:
+                            pacote_completo += f"- {alt}\n"
+                    pacote_completo += "\n"
                 
                 st.download_button(
-                    "💾 Baixar Post",
-                    data=texto_gerado,
-                    file_name=f"blog_post_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
-                    mime="text/plain"
+                    "📦 Baixar Pacote Completo + Histórico",
+                    data=pacote_completo,
+                    file_name=f"pacote_completo_rag_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                    mime="text/plain",
+                    use_container_width=True
                 )
-                
-            except Exception as e:
-                st.error(f"Erro na geração: {str(e)}")
-
-    # Banco de textos gerados
-    st.header("📚 Banco de Textos Gerados")
     
-    posts_anteriores = carregar_posts_anteriores()
-    if posts_anteriores:
-        for post in posts_anteriores:
-            with st.expander(f"{post.get('titulo', 'Sem título')}"):
-                st.write(f"**Cultura:** {post.get('cultura', 'N/A')}")
-                st.write(f"**Palavras:** {post.get('palavras_contagem', 'N/A')}")
+    # ============================================
+    # 11. HISTÓRICO DE GERAÇÕES
+    # ============================================
+    
+    if mongo_connected_blog_rag:
+        st.markdown("---")
+        st.subheader("📚 Histórico de Gerações RAG + Perplexity")
+        
+        try:
+            historico_posts = list(collection_posts_rag.find().sort("data_criacao", -1).limit(5))
+            
+            if historico_posts:
+                for post in historico_posts:
+                    with st.expander(f"📄 {post.get('titulo', 'Sem título')} - {post.get('data_criacao', '').strftime('%d/%m/%Y %H:%M') if post.get('data_criacao') else 'Data desconhecida'}"):
+                        st.write(f"**Cultura:** {post.get('cultura', 'N/A')}")
+                        st.write(f"**Documentos RAG:** {post.get('documentos_rag', 0)}")
+                        st.write(f"**Perplexity:** {'✅' if post.get('perplexity_utilizado') else '❌'}")
+                        
+                        if st.button(f"Carregar este post", key=f"load_{post.get('_id')}"):
+                            st.session_state.conteudo_gerado_rag = post.get('conteudo', '')
+                            st.session_state.briefing_atual = post.get('briefing', {})
+                            st.success("✅ Post carregado! Você pode fazer ajustes pontuais agora.")
+                            st.rerun()
+            else:
+                st.info("Nenhum post encontrado no histórico")
                 
-                # Mostrar metadados salvos
-                if post.get('meta_title'):
-                    st.write(f"**Meta Title:** {post.get('meta_title')}")
-                if post.get('meta_descricao'):
-                    st.write(f"**Meta Descrição:** {post.get('meta_descricao')}")
-                
-                # Mostrar palavras proibidas filtradas
-                if post.get('palavras_proibidas'):
-                    st.write(f"**Palavras proibidas filtradas:** {post.get('palavras_proibidas')}")
-                
-                # Mostrar links internos se existirem
-                if post.get('links_internos'):
-                    st.write("**Links Internos:**")
-                    for link in post['links_internos']:
-                        st.write(f"- [{link.get('texto_ancora', 'N/A')}]({link.get('url', '#')})")
-                
-                st.text_area("Conteúdo:", value=post.get('texto_gerado', ''), height=200, key=post['id'])
-                
-                col_uso1, col_uso2 = st.columns(2)
-                with col_uso1:
-                    if st.button("Reutilizar", key=f"reuse_{post['id']}"):
-                        st.session_state.texto_gerado = post.get('texto_gerado', '')
-                        st.success("Conteúdo carregado para reutilização!")
-                with col_uso2:
-                    st.download_button(
-                        label="📥 Download",
-                        data=post.get('texto_gerado', ''),
-                        file_name=f"blog_post_{post.get('titulo', 'post').lower().replace(' ', '_')}.txt",
-                        mime="text/plain",
-                        key=f"dl_btn_{post['id']}"
-                    )
-    else:
-        st.info("Nenhum post encontrado no banco de dados.")
+        except Exception as e:
+            st.warning(f"Erro ao carregar histórico: {str(e)}")
 
 # ========== ABA: REVISÃO ORTOGRÁFICA ==========
 with tab_revisao_ortografica:
