@@ -1428,7 +1428,7 @@ Pontos-chave: [lista os principais pontos]""")
                 st.warning(f"Erro ao carregar histórico: {str(e)}")
 
 # ========== ABA: BLOG INTELIGENTE COM RAG TÉCNICO + PERPLEXITY ==========
-with tab_blog_rag:  # NOVA ABA - precisa adicionar na lista de tabs
+with tab_blog:  # NOVA ABA - precisa adicionar na lista de tabs
     st.header("🌱 Blog Inteligente com RAG Técnico + Perplexity")
     st.markdown("**Geração de conteúdo agrícola com base na base técnica + busca web com fontes citadas**")
     
