@@ -4614,6 +4614,57 @@ with tab_briefings:
                                 Gere um briefing completo baseado APENAS nesta pauta específica.
                                 Use a base de conhecimento fornecida para identificar produtos, culturas e informações técnicas.
                                 Formato completo com contexto, objetivos e formatos.
+
+                                # [TÍTULO DO BRIEFING]
+
+                                ## 1. OBJETIVO DO CONTEÚDO
+                                [Descreva claramente o objetivo principal deste conteúdo]
+
+                                ## 2. PÚBLICO-ALVO
+                                [Descreva a persona, nível técnico, perfil do produtor/leitor]
+
+                                ## 3. TEMA PRINCIPAL E ABORDAGEM
+                                [Detalhe o tema central e a abordagem sugerida]
+
+                                ## 4. PRODUTOS ENVOLVIDOS
+                                [Liste os produtos e seus papéis no conteúdo]
+
+                                ## 5. CULTURAS ALVO
+                                [Especifique as culturas agrícolas relevantes]
+
+                                ## 6. PONTOS-CHAVE OBRIGATÓRIOS
+                                - [Ponto 1]
+                                - [Ponto 2]
+                                - [Ponto 3]
+                                [Continue conforme necessário]
+
+                                ## 7. TOM DE VOZ E ESTILO
+                                [Especifique o tom: técnico, educativo, comercial, etc.]
+
+                                ## 8. FORMATOS SUGERIDOS
+                                - [Formato 1: ex: Post para Instagram]
+                                - [Formato 2: ex: Artigo para blog]
+                                - [Formato 3: ex: Roteiro para vídeo]
+
+                                ## 9. PALAVRAS-CHAVE (SEO)
+                                - Palavra-chave principal:
+                                - Palavras-chave secundárias:
+
+                                ## 10. CALL TO ACTION (CTA) SUGERIDO
+                                [Texto sugerido para o CTA]
+
+                                ## 11. INFORMAÇÕES TÉCNICAS RELEVANTES
+                                [Dados técnicos, estatísticas, informações de manejo que devem ser incluídas]
+
+                                ## 12. RESTRIÇÕES E CUIDADOS
+                                [O que evitar, termos proibidos, cuidados especiais]
+
+                                ## 13. REFERÊNCIAS SUGERIDAS
+                                [Fontes, materiais de apoio, links úteis]
+
+                                Seja detalhado e específico. O briefing deve servir como um guia completo para a criação do conteúdo.
+
+                                Quando trouxer informações de produtos, os traga exatamente como são sem reescrita.
                                 """
 
                                 resposta = modelo_texto.generate_content(prompt_briefing)
@@ -4764,6 +4815,8 @@ with tab_briefings:
                                 [Fontes, materiais de apoio, links úteis]
 
                                 Seja detalhado e específico. O briefing deve servir como um guia completo para a criação do conteúdo.
+
+                                Quando trouxer informações de produtos, os traga exatamente como são sem reescrita.
                                 """
 
                                 resposta = modelo_texto.generate_content(prompt_briefing_individual)
