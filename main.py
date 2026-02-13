@@ -4447,7 +4447,7 @@ Victrato pelo Brasil - Soja e Cana - Ação nacional""",
 
 # ========== ABA: GERADOR DE BRIEFINGS ==========
 with tab_briefings:
-    st.header("📋 Gerador de Briefings a partir do Calendário")
+    st.header("📋 Gerador de Briefings")
     
     # Verificar se há agente selecionado
     if not st.session_state.agente_selecionado:
@@ -4459,285 +4459,640 @@ with tab_briefings:
         # Inicializar session_state para briefings
         if 'briefings_gerados' not in st.session_state:
             st.session_state.briefings_gerados = []
+        if 'briefing_atual_selecionado' not in st.session_state:
+            st.session_state.briefing_atual_selecionado = None
+        if 'briefing_em_edicao' not in st.session_state:
+            st.session_state.briefing_em_edicao = None
         
-        # Upload do CSV ou usar o gerado
-        col_upload1, col_upload2 = st.columns([2, 1])
-        
-        with col_upload1:
-            usar_calendario_existente = st.checkbox("Usar calendário gerado anteriormente", 
-                                                  value='calendario_gerado' in st.session_state)
-            
-            if not usar_calendario_existente or 'calendario_gerado' not in st.session_state:
-                arquivo_calendario = st.file_uploader("📅 Upload do calendário CSV:", type=['csv'])
-            else:
-                st.info("✅ Usando calendário gerado anteriormente")
-                arquivo_calendario = None
-        
-        with col_upload2:
-            mes_referencia = st.text_input("Mês de referência:", "JANEIRO 2026")
-            ano_referencia = st.text_input("Ano de referência:", "2026")
-        
-        # Contexto adicional para os briefings
-        contexto_briefings = st.text_area(
-            "Informações contextuais para orientar a criação dos briefings:",
-            placeholder="Exemplo: Foco em campanha de posicionamento de produtos, linguagem técnica mas acessível...",
-            height=80
+        # ABAS PRINCIPAIS: Upload Calendário vs Texto Único
+        modo_entrada = st.radio(
+            "Escolha o modo de entrada:",
+            ["📅 Upload de Calendário (múltiplos briefings)", "📝 Texto Único (briefing individual)"],
+            horizontal=True
         )
         
-        # Botão para processar e gerar briefings
-        if st.button("🔄 Processar Calendário e Gerar Briefings", type="primary", use_container_width=True):
-            # Obter o conteúdo do CSV
-            conteudo_csv = ""
+        # --- MODO 1: UPLOAD DE CALENDÁRIO ---
+        if modo_entrada == "📅 Upload de Calendário (múltiplos briefings)":
+            st.subheader("📅 Gerar Múltiplos Briefings a partir do Calendário")
             
-            if usar_calendario_existente and 'calendario_gerado' in st.session_state:
-                conteudo_csv = st.session_state.calendario_gerado
-                st.success("✅ Usando calendário da sessão")
-            elif arquivo_calendario is not None:
-                try:
-                    # Tentar diferentes encodings
-                    file_bytes = arquivo_calendario.getvalue()
-                    
-                    # Tentar UTF-8 primeiro
+            col_upload1, col_upload2 = st.columns([2, 1])
+            
+            with col_upload1:
+                usar_calendario_existente = st.checkbox("Usar calendário gerado anteriormente", 
+                                                      value='calendario_gerado' in st.session_state)
+                
+                if not usar_calendario_existente or 'calendario_gerado' not in st.session_state:
+                    arquivo_calendario = st.file_uploader("📅 Upload do calendário CSV:", type=['csv'])
+                else:
+                    st.info("✅ Usando calendário gerado anteriormente")
+                    arquivo_calendario = None
+            
+            with col_upload2:
+                mes_referencia = st.text_input("Mês de referência:", "JANEIRO 2026")
+                ano_referencia = st.text_input("Ano de referência:", "2026")
+            
+            # Contexto adicional para os briefings
+            contexto_briefings = st.text_area(
+                "Informações contextuais para orientar a criação dos briefings:",
+                placeholder="Exemplo: Foco em campanha de posicionamento de produtos, linguagem técnica mas acessível...",
+                height=80
+            )
+            
+            # Botão para processar calendário
+            if st.button("🔄 Processar Calendário e Gerar Briefings", type="primary", use_container_width=True):
+                # Obter o conteúdo do CSV
+                conteudo_csv = ""
+                
+                if usar_calendario_existente and 'calendario_gerado' in st.session_state:
+                    conteudo_csv = st.session_state.calendario_gerado
+                    st.success("✅ Usando calendário da sessão")
+                elif arquivo_calendario is not None:
                     try:
-                        conteudo_csv = file_bytes.decode('utf-8')
-                    except UnicodeDecodeError:
-                        # Tentar Latin-1 (ISO-8859-1)
-                        try:
-                            conteudo_csv = file_bytes.decode('latin-1')
-                        except UnicodeDecodeError:
-                            # Tentar UTF-8 com tratamento de erros
-                            conteudo_csv = file_bytes.decode('utf-8', errors='ignore')
-                    
-                    st.success("✅ Arquivo CSV carregado")
-                except Exception as e:
-                    st.error(f"❌ Erro ao ler arquivo: {str(e)}")
-                    st.stop()
-            else:
-                st.error("❌ Nenhum calendário disponível para processar")
-                st.stop()
-            
-            # Processar o CSV para extrair TODAS as células de conteúdo
-            with st.spinner("📋 Processando calendário e extraindo pautas..."):
-                try:
-                    linhas = conteudo_csv.split('\n')
-                    todas_pautas = []
-                    
-                    # Processar cada linha do CSV para encontrar TODAS as pautas
-                    for linha_num, linha in enumerate(linhas):
-                        # Limpar a linha de caracteres problemáticos
-                        linha_limpa = linha.strip().replace('\r', '').replace('﻿', '')  # Remove BOM
-                        if not linha_limpa:
-                            continue
-                            
-                        celulas = linha_limpa.split(',')
-                        for celula_num, celula in enumerate(celulas):
-                            celula_limpa = celula.strip()
-                            
-                            # CRITÉRIO SIMPLES: qualquer conteúdo com mais de 15 caracteres que não seja apenas números
-                            if (celula_limpa and 
-                                len(celula_limpa) > 15 and 
-                                not celula_limpa.replace('.', '').isdigit() and  # Não é apenas número
-                                not any(header in celula_limpa for header in ['DOMINGO', 'SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SÁBADO', 'CALENDÁRIO']) and
-                                'CX,' not in celula_limpa):
-                                
-                                # É uma pauta - processar cada uma separadamente
-                                pautas_na_celula = []
-                                
-                                # Dividir por quebras de linha para pegar múltiplas pautas na mesma célula
-                                if '\n' in celula_limpa:
-                                    # Célula com múltiplas pautas (2 ou 3 pautas por dia)
-                                    sub_pautas = celula_limpa.split('\n')
-                                    for sub_pauta in sub_pautas:
-                                        sub_pauta_limpa = sub_pauta.strip()
-                                        if sub_pauta_limpa and len(sub_pauta_limpa) > 15:
-                                            pautas_na_celula.append(sub_pauta_limpa)
-                                else:
-                                    # Célula com uma única pauta
-                                    pautas_na_celula.append(celula_limpa)
-                                
-                                # Adicionar cada pauta individualmente
-                                for pauta in pautas_na_celula:
-                                    # Limpar e padronizar a pauta
-                                    pauta_limpa = pauta.strip()
-                                    pauta_limpa = ' '.join(pauta_limpa.split())
-                                    
-                                    todas_pautas.append({
-                                        'conteudo': pauta_limpa,
-                                        'linha': linha_num,
-                                        'coluna': celula_num,
-                                        'indice': len(todas_pautas) + 1
-                                    })
-                    
-                    st.success(f"✅ Encontradas {len(todas_pautas)} pautas individuais no calendário")
-                    
-                    if not todas_pautas:
-                        st.error("❌ Nenhuma pauta válida encontrada no CSV")
-                        st.info("💡 **Dica:** O sistema procura por qualquer conteúdo com mais de 15 caracteres")
-                        st.stop()
-                    
-                    # Mostrar preview das pautas encontradas
-                    with st.expander("👀 Visualizar Pautas Detectadas", expanded=True):
-                        st.write(f"**Total de pautas detectadas:** {len(todas_pautas)}")
-                        st.write("**Primeiras 10 pautas:**")
-                        for i, pauta in enumerate(todas_pautas[:10]):
-                            st.write(f"{i+1}. {pauta['conteudo']}")
-                    
-                    # Gerar briefings para CADA pauta individual
-                    st.subheader("📄 Gerando Briefings para Cada Pauta")
-                    
-                    # Construir contexto do agente
-                    contexto_agente = construir_contexto(agente, st.session_state.segmentos_selecionados)
-                    
-                    # Processar TODAS as pautas
-                    pautas_processar = todas_pautas
-                    st.info(f"🔄 Gerando {len(pautas_processar)} briefings")
-                    
-                    briefings_gerados = []
-                    
-                    # Barra de progresso
-                    progress_bar = st.progress(0)
-                    status_text = st.empty()
-                    
-                    for idx, pauta in enumerate(pautas_processar):
-                        status_text.text(f"Fazendo briefing da pauta {idx+1}/{len(pautas_processar)}: {pauta['conteudo'][:50]}...")
-                        progress_bar.progress((idx + 1) / len(pautas_processar))
+                        file_bytes = arquivo_calendario.getvalue()
                         
+                        # Tentar diferentes encodings
                         try:
-                            # Prompt SIMPLES e DIRETO para gerar o briefing
-                            prompt_briefing = f"""
-                            {contexto_agente}
-
-                            ## TAREFA: GERAR BRIEFING COMPLETO PARA ESTA PAUTA ESPECÍFICA
-
-                            **PAUTA ESPECÍFICA:**
-                            {pauta['conteudo']}
-
-                            **MÊS DE REFERÊNCIA:** {mes_referencia}
-
-                            **CONTEXTO ADICIONAL:**
-                            {contexto_briefings if contexto_briefings else "Nenhum contexto adicional fornecido."}
-
-                            Gere um briefing completo baseado APENAS nesta pauta específica.
-                            Use a base de conhecimento fornecida para identificar produtos, culturas e informações técnicas.
-                            Formato completo com contexto, objetivos e formatos.
-                            """
-
-                            # Gerar o briefing
-                            resposta = modelo_texto.generate_content(prompt_briefing)
-                            briefing_gerado = resposta.text
+                            conteudo_csv = file_bytes.decode('utf-8')
+                        except UnicodeDecodeError:
+                            try:
+                                conteudo_csv = file_bytes.decode('latin-1')
+                            except UnicodeDecodeError:
+                                conteudo_csv = file_bytes.decode('utf-8', errors='ignore')
+                        
+                        st.success("✅ Arquivo CSV carregado")
+                    except Exception as e:
+                        st.error(f"❌ Erro ao ler arquivo: {str(e)}")
+                        st.stop()
+                else:
+                    st.error("❌ Nenhum calendário disponível para processar")
+                    st.stop()
+                
+                # Processar o CSV para extrair TODAS as células de conteúdo
+                with st.spinner("📋 Processando calendário e extraindo pautas..."):
+                    try:
+                        linhas = conteudo_csv.split('\n')
+                        todas_pautas = []
+                        
+                        for linha_num, linha in enumerate(linhas):
+                            linha_limpa = linha.strip().replace('\r', '').replace('﻿', '')
+                            if not linha_limpa:
+                                continue
+                                
+                            celulas = linha_limpa.split(',')
+                            for celula_num, celula in enumerate(celulas):
+                                celula_limpa = celula.strip()
+                                
+                                if (celula_limpa and 
+                                    len(celula_limpa) > 15 and 
+                                    not celula_limpa.replace('.', '').isdigit() and
+                                    not any(header in celula_limpa for header in ['DOMINGO', 'SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SÁBADO', 'CALENDÁRIO']) and
+                                    'CX,' not in celula_limpa):
+                                    
+                                    pautas_na_celula = []
+                                    
+                                    if '\n' in celula_limpa:
+                                        sub_pautas = celula_limpa.split('\n')
+                                        for sub_pauta in sub_pautas:
+                                            sub_pauta_limpa = sub_pauta.strip()
+                                            if sub_pauta_limpa and len(sub_pauta_limpa) > 15:
+                                                pautas_na_celula.append(sub_pauta_limpa)
+                                    else:
+                                        pautas_na_celula.append(celula_limpa)
+                                    
+                                    for pauta in pautas_na_celula:
+                                        pauta_limpa = pauta.strip()
+                                        pauta_limpa = ' '.join(pauta_limpa.split())
+                                        
+                                        todas_pautas.append({
+                                            'conteudo': pauta_limpa,
+                                            'linha': linha_num,
+                                            'coluna': celula_num,
+                                            'indice': len(todas_pautas) + 1
+                                        })
+                        
+                        st.success(f"✅ Encontradas {len(todas_pautas)} pautas individuais no calendário")
+                        
+                        if not todas_pautas:
+                            st.error("❌ Nenhuma pauta válida encontrada no CSV")
+                            st.stop()
+                        
+                        # Mostrar preview das pautas encontradas
+                        with st.expander("👀 Visualizar Pautas Detectadas", expanded=True):
+                            st.write(f"**Total de pautas detectadas:** {len(todas_pautas)}")
+                            st.write("**Primeiras 10 pautas:**")
+                            for i, pauta in enumerate(todas_pautas[:10]):
+                                st.write(f"{i+1}. {pauta['conteudo']}")
+                        
+                        # Gerar briefings
+                        st.subheader("📄 Gerando Briefings para Cada Pauta")
+                        
+                        contexto_agente = construir_contexto(agente, st.session_state.segmentos_selecionados)
+                        
+                        briefings_gerados = []
+                        
+                        progress_bar = st.progress(0)
+                        status_text = st.empty()
+                        
+                        for idx, pauta in enumerate(todas_pautas):
+                            status_text.text(f"Fazendo briefing da pauta {idx+1}/{len(todas_pautas)}: {pauta['conteudo'][:50]}...")
+                            progress_bar.progress((idx + 1) / len(todas_pautas))
                             
-                            # Limpar possíveis markdown
-                            briefing_limpo = briefing_gerado.strip()
-                            if '```' in briefing_limpo:
-                                briefing_limpo = briefing_limpo.replace('```', '')
-                            
-                            # Armazenar briefing
-                            briefings_gerados.append({
-                                'indice': idx + 1,
-                                'conteudo_original': pauta['conteudo'],
-                                'briefing': briefing_limpo
-                            })
-                            
-                        except Exception as e:
-                            st.error(f"❌ Erro ao gerar briefing para pauta {idx+1}: {str(e)}")
-                            briefings_gerados.append({
-                                'indice': idx + 1,
-                                'conteudo_original': pauta['conteudo'],
-                                'briefing': f"ERRO: Não foi possível gerar o briefing.\n{str(e)}"
-                            })
-                    
-                    # Limpar barra de progresso
-                    progress_bar.empty()
-                    status_text.empty()
-                    
-                    # Salvar briefings na session_state
-                    st.session_state.briefings_gerados = briefings_gerados
-                    st.success(f"✅ {len(briefings_gerados)} briefings gerados com sucesso!")
-                    
-                except Exception as e:
-                    st.error(f"❌ Erro ao processar calendário: {str(e)}")
+                            try:
+                                prompt_briefing = f"""
+                                {contexto_agente}
 
-        # MOSTRAR BRIEFINGS GERADOS (sempre que existirem na session_state)
+                                ## TAREFA: GERAR BRIEFING COMPLETO PARA ESTA PAUTA ESPECÍFICA
+
+                                **PAUTA ESPECÍFICA:**
+                                {pauta['conteudo']}
+
+                                **MÊS DE REFERÊNCIA:** {mes_referencia}
+
+                                **CONTEXTO ADICIONAL:**
+                                {contexto_briefings if contexto_briefings else "Nenhum contexto adicional fornecido."}
+
+                                Gere um briefing completo baseado APENAS nesta pauta específica.
+                                Use a base de conhecimento fornecida para identificar produtos, culturas e informações técnicas.
+                                Formato completo com contexto, objetivos e formatos.
+                                """
+
+                                resposta = modelo_texto.generate_content(prompt_briefing)
+                                briefing_gerado = resposta.text
+                                
+                                briefing_limpo = briefing_gerado.strip()
+                                if '```' in briefing_limpo:
+                                    briefing_limpo = briefing_limpo.replace('```', '')
+                                
+                                briefings_gerados.append({
+                                    'indice': idx + 1,
+                                    'conteudo_original': pauta['conteudo'],
+                                    'briefing': briefing_limpo,
+                                    'mes_referencia': mes_referencia
+                                })
+                                
+                            except Exception as e:
+                                st.error(f"❌ Erro ao gerar briefing para pauta {idx+1}: {str(e)}")
+                                briefings_gerados.append({
+                                    'indice': idx + 1,
+                                    'conteudo_original': pauta['conteudo'],
+                                    'briefing': f"ERRO: Não foi possível gerar o briefing.\n{str(e)}",
+                                    'mes_referencia': mes_referencia
+                                })
+                        
+                        progress_bar.empty()
+                        status_text.empty()
+                        
+                        st.session_state.briefings_gerados = briefings_gerados
+                        st.success(f"✅ {len(briefings_gerados)} briefings gerados com sucesso!")
+                        
+                    except Exception as e:
+                        st.error(f"❌ Erro ao processar calendário: {str(e)}")
+        
+        # --- MODO 2: TEXTO ÚNICO PARA BRIEFING INDIVIDUAL ---
+        else:  # modo_entrada == "📝 Texto Único (briefing individual)"
+            st.subheader("📝 Gerar Briefing Individual a partir de Texto")
+            
+            # Campos para briefing individual
+            col_texto1, col_texto2 = st.columns([2, 1])
+            
+            with col_texto1:
+                titulo_briefing = st.text_input(
+                    "Título do briefing:",
+                    placeholder="Ex: Lançamento do produto X na cultura Y",
+                    key="titulo_briefing_individual"
+                )
+            
+            with col_texto2:
+                mes_referencia_individual = st.text_input(
+                    "Mês de referência:", 
+                    "JANEIRO 2026",
+                    key="mes_ref_individual"
+                )
+            
+            # Texto base para o briefing
+            texto_base_briefing = st.text_area(
+                "Texto base para gerar o briefing:",
+                height=150,
+                placeholder="Cole aqui o texto que servirá de base para o briefing. Pode ser uma pauta, um resumo, instruções do cliente, etc.",
+                key="texto_base_individual"
+            )
+            
+            # Contexto adicional
+            contexto_individual = st.text_area(
+                "Contexto adicional (opcional):",
+                height=80,
+                placeholder="Informações complementares para orientar a criação do briefing...",
+                key="contexto_individual"
+            )
+            
+            # Botão para gerar briefing individual
+            col_btn_ind1, col_btn_ind2, col_btn_ind3 = st.columns([1, 2, 1])
+            with col_btn_ind2:
+                if st.button("📄 GERAR BRIEFING INDIVIDUAL", type="primary", use_container_width=True):
+                    if not texto_base_briefing:
+                        st.error("❌ O texto base é obrigatório!")
+                    elif not titulo_briefing:
+                        st.error("❌ O título do briefing é obrigatório!")
+                    else:
+                        with st.spinner("🔄 Gerando briefing individual..."):
+                            try:
+                                contexto_agente = construir_contexto(agente, st.session_state.segmentos_selecionados)
+                                
+                                prompt_briefing_individual = f"""
+                                {contexto_agente}
+
+                                ## TAREFA: GERAR BRIEFING COMPLETO E ESTRUTURADO
+
+                                **TÍTULO DO BRIEFING:** {titulo_briefing}
+                                **MÊS DE REFERÊNCIA:** {mes_referencia_individual}
+
+                                **TEXTO BASE:**
+                                {texto_base_briefing}
+
+                                **CONTEXTO ADICIONAL:**
+                                {contexto_individual if contexto_individual else "Nenhum contexto adicional fornecido."}
+
+                                ## INSTRUÇÕES PARA O FORMATO DO BRIEFING:
+
+                                Gere um briefing completo seguindo EXATAMENTE esta estrutura:
+
+                                # [TÍTULO DO BRIEFING]
+
+                                ## 1. OBJETIVO DO CONTEÚDO
+                                [Descreva claramente o objetivo principal deste conteúdo]
+
+                                ## 2. PÚBLICO-ALVO
+                                [Descreva a persona, nível técnico, perfil do produtor/leitor]
+
+                                ## 3. TEMA PRINCIPAL E ABORDAGEM
+                                [Detalhe o tema central e a abordagem sugerida]
+
+                                ## 4. PRODUTOS ENVOLVIDOS
+                                [Liste os produtos e seus papéis no conteúdo]
+
+                                ## 5. CULTURAS ALVO
+                                [Especifique as culturas agrícolas relevantes]
+
+                                ## 6. PONTOS-CHAVE OBRIGATÓRIOS
+                                - [Ponto 1]
+                                - [Ponto 2]
+                                - [Ponto 3]
+                                [Continue conforme necessário]
+
+                                ## 7. TOM DE VOZ E ESTILO
+                                [Especifique o tom: técnico, educativo, comercial, etc.]
+
+                                ## 8. FORMATOS SUGERIDOS
+                                - [Formato 1: ex: Post para Instagram]
+                                - [Formato 2: ex: Artigo para blog]
+                                - [Formato 3: ex: Roteiro para vídeo]
+
+                                ## 9. PALAVRAS-CHAVE (SEO)
+                                - Palavra-chave principal:
+                                - Palavras-chave secundárias:
+
+                                ## 10. CALL TO ACTION (CTA) SUGERIDO
+                                [Texto sugerido para o CTA]
+
+                                ## 11. INFORMAÇÕES TÉCNICAS RELEVANTES
+                                [Dados técnicos, estatísticas, informações de manejo que devem ser incluídas]
+
+                                ## 12. RESTRIÇÕES E CUIDADOS
+                                [O que evitar, termos proibidos, cuidados especiais]
+
+                                ## 13. REFERÊNCIAS SUGERIDAS
+                                [Fontes, materiais de apoio, links úteis]
+
+                                Seja detalhado e específico. O briefing deve servir como um guia completo para a criação do conteúdo.
+                                """
+
+                                resposta = modelo_texto.generate_content(prompt_briefing_individual)
+                                briefing_gerado = resposta.text
+                                
+                                briefing_limpo = briefing_gerado.strip()
+                                if '```' in briefing_limpo:
+                                    briefing_limpo = briefing_limpo.replace('```', '')
+                                
+                                # Adicionar aos briefings gerados
+                                novo_briefing = {
+                                    'indice': len(st.session_state.briefings_gerados) + 1,
+                                    'titulo': titulo_briefing,
+                                    'conteudo_original': texto_base_briefing,
+                                    'briefing': briefing_limpo,
+                                    'mes_referencia': mes_referencia_individual,
+                                    'tipo': 'individual'
+                                }
+                                
+                                st.session_state.briefings_gerados.append(novo_briefing)
+                                st.session_state.briefing_atual_selecionado = novo_briefing
+                                
+                                st.success(f"✅ Briefing '{titulo_briefing}' gerado com sucesso!")
+                                
+                            except Exception as e:
+                                st.error(f"❌ Erro ao gerar briefing: {str(e)}")
+        
+        # --- SEÇÃO DE VISUALIZAÇÃO E AJUSTE DOS BRIEFINGS (comum aos dois modos) ---
         if st.session_state.briefings_gerados:
             st.markdown("---")
-            st.subheader("📄 Briefings Gerados")
+            st.header("📋 Briefings Gerados")
             
-            briefings_gerados = st.session_state.briefings_gerados
+            briefings = st.session_state.briefings_gerados
             
-            # Abas para organizar os briefings
-            tab_individual, tab_lote = st.tabs(["📄 Briefings Individuais", "📦 Download em Lote"])
+            # Seletor de briefing para visualizar/editar
+            briefing_options = {}
+            for b in briefings:
+                if 'titulo' in b:
+                    # Briefing individual
+                    label = f"{b['indice']}. {b['titulo']} ({b.get('mes_referencia', 'N/A')})"
+                else:
+                    # Briefing de calendário
+                    label = f"{b['indice']}. {b['conteudo_original'][:60]}... ({b.get('mes_referencia', 'N/A')})"
+                briefing_options[label] = b
             
-            with tab_individual:
-                st.write(f"**Total de briefings gerados:** {len(briefings_gerados)}")
+            if briefing_options:
+                col_sel1, col_sel2 = st.columns([3, 1])
                 
-                for briefing in briefings_gerados:
-                    with st.expander(f"📋 Briefing {briefing['indice']}: {briefing['conteudo_original'][:60]}...", expanded=False):
-                        st.write(f"**Pauta original:** {briefing['conteudo_original']}")
-                        st.text_area(f"Conteúdo do Briefing {briefing['indice']}", 
-                                   briefing['briefing'], 
-                                   height=300, 
-                                   key=f"briefing_{briefing['indice']}")
-                        
-                        # Botões de ação para cada briefing
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            nome_arquivo = f"briefing_{briefing['indice']}.txt"
-                            st.download_button(
-                                f"💾 Baixar Briefing {briefing['indice']}",
-                                data=briefing['briefing'],
-                                file_name=nome_arquivo,
-                                mime="text/plain",
-                                key=f"dl_single_{briefing['indice']}"
-                            )
+                with col_sel1:
+                    briefing_selecionado_label = st.selectbox(
+                        "Selecione um briefing para visualizar/editar:",
+                        list(briefing_options.keys()),
+                        key="seletor_briefing_edicao"
+                    )
+                
+                with col_sel2:
+                    if st.button("🔄 Carregar Briefing", key="carregar_briefing"):
+                        st.session_state.briefing_atual_selecionado = briefing_options[briefing_selecionado_label]
+                        st.session_state.briefing_em_edicao = briefing_options[briefing_selecionado_label]['briefing']
+                        st.rerun()
             
-            with tab_lote:
-                st.subheader("📦 Download em Lote")
+            # Briefing atual selecionado
+            if st.session_state.briefing_atual_selecionado:
+                briefing_atual = st.session_state.briefing_atual_selecionado
                 
-                # Criar ZIP sem usar with statement para evitar fechamento prematuro
-                import zipfile
-                import io
+                st.markdown("---")
+                st.subheader(f"📄 Briefing {briefing_atual['indice']}")
                 
-                # Criar o buffer e o arquivo ZIP
-                zip_buffer = io.BytesIO()
-                zip_file = zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED)
+                # Mostrar informações do briefing original
+                if 'titulo' in briefing_atual:
+                    st.info(f"**Título:** {briefing_atual['titulo']}")
+                else:
+                    st.info(f"**Pauta original:** {briefing_atual['conteudo_original']}")
                 
-                try:
-                    # Adicionar briefings individuais
-                    for briefing in briefings_gerados:
-                        nome_arquivo = f"briefing_{briefing['indice']}.txt"
-                        zip_file.writestr(nome_arquivo, briefing['briefing'])
-                    
-                    # Criar arquivo consolidado
-                    consolidado = f"BRIEFINGS - {mes_referencia}\n"
-                    consolidado += f"Total de briefings: {len(briefings_gerados)}\n"
-                    consolidado += "="*60 + "\n\n"
-                    
-                    for briefing in briefings_gerados:
-                        consolidado += f"BRIEFING {briefing['indice']}\n"
-                        consolidado += f"Pauta: {briefing['conteudo_original']}\n"
-                        consolidado += "-"*40 + "\n"
-                        consolidado += f"{briefing['briefing']}\n\n"
-                        consolidado += "="*60 + "\n\n"
-                    
-                    # Adicionar arquivo consolidado
-                    zip_file.writestr(f"briefings_consolidados_{mes_referencia.replace(' ', '_').lower()}.txt", consolidado)
-                    
-                finally:
-                    # Fechar o arquivo ZIP manualmente
-                    zip_file.close()
+                st.write(f"**Mês referência:** {briefing_atual.get('mes_referencia', 'N/A')}")
                 
-                # Botão de download
-                st.download_button(
-                    "📥 Baixar Todos os Briefings (ZIP)",
-                    data=zip_buffer.getvalue(),
-                    file_name=f"briefings_completos_{mes_referencia.replace(' ', '_').lower()}_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.zip",
-                    mime="application/zip",
-                    type="primary"
+                # ============================================
+                # SEÇÃO DE AJUSTE PONTUAL DO BRIEFING
+                # ============================================
+                st.markdown("---")
+                st.subheader("✏️ Ajuste Pontual do Briefing")
+                st.markdown("**Mantenha a estrutura - altere apenas o solicitado**")
+                
+                col_ajuste1, col_ajuste2 = st.columns([3, 1])
+                
+                with col_ajuste1:
+                    solicitacao_ajuste_briefing = st.text_area(
+                        "Descreva o ajuste desejado:",
+                        placeholder="Exemplos:\n- Adicione mais detalhes sobre o público-alvo\n- Inclua informações sobre o produto X na seção de produtos\n- Reforce a necessidade de dados técnicos\n- Simplifique a linguagem na seção de tom de voz\n- Adicione um formato de conteúdo a mais",
+                        height=100,
+                        key="ajuste_briefing"
+                    )
+                
+                with col_ajuste2:
+                    st.markdown("#####")  # Espaçamento
+                    if st.button("✅ APLICAR AJUSTE", key="aplicar_ajuste_briefing", use_container_width=True):
+                        if solicitacao_ajuste_briefing.strip():
+                            with st.spinner("🔄 Aplicando ajuste pontual ao briefing..."):
+                                try:
+                                    contexto_agente = construir_contexto(agente, st.session_state.segmentos_selecionados)
+                                    
+                                    prompt_ajuste_briefing = f"""
+                                    {contexto_agente}
+
+                                    ## INSTRUÇÕES: AJUSTE PONTUAL DO BRIEFING
+                                    ## MANTENHA A ESTRUTURA ORIGINAL - ALTERE APENAS O SOLICITADO
+
+                                    --------------------------------------------------------------------
+
+                                    ### BRIEFING ORIGINAL COMPLETO:
+                                    
+                                    {briefing_atual['briefing']}
+
+                                    --------------------------------------------------------------------
+
+                                    ### SOLICITAÇÃO ESPECÍFICA DE AJUSTE:
+                                    "{solicitacao_ajuste_briefing}"
+
+                                    --------------------------------------------------------------------
+
+                                    ## INFORMAÇÕES DE CONTEXTO:
+                                    
+                                    **Título/Pauta original:** {briefing_atual.get('titulo', briefing_atual.get('conteudo_original', 'N/A'))}
+                                    **Mês de referência:** {briefing_atual.get('mes_referencia', 'N/A')}
+
+                                    --------------------------------------------------------------------
+
+                                    ## REGRAS ABSOLUTAS:
+
+                                    1. **MANTENHA A ESTRUTURA ORIGINAL COMPLETA**
+                                       - NÃO remova seções
+                                       - NÃO adicione novas seções
+                                       - NÃO renomeie títulos das seções
+                                       - NÃO altere a ordem do conteúdo
+
+                                    2. **ALTERE APENAS O ESTRITAMENTE SOLICITADO**
+                                       - Se o usuário pediu para "adicionar X na seção Y", adicione APENAS isso
+                                       - Se o usuário pediu para "corrigir Z", corrija APENAS Z
+                                       - TODO o resto do briefing deve permanecer IDÊNTICO
+
+                                    3. **PRESERVE FORMATAÇÃO E ESTILO**
+                                       - Mantenha todos os negritos, itálicos, markdown exatamente iguais
+                                       - Mantenha a numeração das seções
+                                       - Mantenha os bullets points exatamente como estão
+
+                                    --------------------------------------------------------------------
+
+                                    ## SUA TAREFA:
+
+                                    1. IDENTIFIQUE exatamente o que o usuário quer modificar
+                                    2. LOCALIZE esse trecho no briefing original
+                                    3. APLIQUE a modificação solicitada com PRECISÃO CIRÚRGICA
+                                    4. RETORNE O BRIEFING COMPLETO com a alteração feita
+
+                                    **IMPORTANTE:** O briefing retornado deve ser IDÊNTICO ao original, 
+                                    EXCETO pela modificação pontual solicitada.
+
+                                    RETORNE APENAS O BRIEFING AJUSTADO, SEM COMENTÁRIOS ADICIONAIS.
+                                    """
+                                    
+                                    resposta_ajuste = modelo_texto.generate_content(prompt_ajuste_briefing)
+                                    briefing_ajustado = resposta_ajuste.text
+                                    
+                                    # Limpar possíveis markdown
+                                    if '```' in briefing_ajustado:
+                                        briefing_ajustado = briefing_ajustado.replace('```', '')
+                                    
+                                    # Atualizar o briefing
+                                    briefing_atual['briefing'] = briefing_ajustado
+                                    briefing_atual['historico_ajustes'] = briefing_atual.get('historico_ajustes', [])
+                                    briefing_atual['historico_ajustes'].append({
+                                        'data': datetime.datetime.now(),
+                                        'solicitacao': solicitacao_ajuste_briefing
+                                    })
+                                    
+                                    st.session_state.briefing_em_edicao = briefing_ajustado
+                                    
+                                    st.success("✅ Ajuste aplicado com sucesso! Estrutura original preservada.")
+                                    st.rerun()
+                                    
+                                except Exception as e:
+                                    st.error(f"❌ Erro ao aplicar ajuste: {str(e)}")
+                        else:
+                            st.warning("⚠️ Por favor, descreva o ajuste desejado.")
+                
+                # ============================================
+                # VISUALIZAÇÃO DO BRIEFING ATUAL
+                # ============================================
+                
+                # Usar o briefing em edição se existir, senão usar o original
+                briefing_para_mostrar = st.session_state.briefing_em_edicao if st.session_state.briefing_em_edicao else briefing_atual['briefing']
+                
+                # Editor de texto para visualização/edição direta
+                briefing_editado = st.text_area(
+                    "📝 Conteúdo do Briefing (você pode editar diretamente):",
+                    value=briefing_para_mostrar,
+                    height=400,
+                    key="editor_briefing_direto"
                 )
+                
+                # Botão para salvar edições diretas
+                col_save1, col_save2, col_save3 = st.columns([1, 1, 2])
+                
+                with col_save1:
+                    if st.button("💾 Salvar Edições Diretas", type="primary", use_container_width=True):
+                        if briefing_editado != briefing_atual['briefing']:
+                            briefing_atual['briefing'] = briefing_editado
+                            briefing_atual['historico_ajustes'] = briefing_atual.get('historico_ajustes', [])
+                            briefing_atual['historico_ajustes'].append({
+                                'data': datetime.datetime.now(),
+                                'solicitacao': 'Edição direta no editor'
+                            })
+                            st.session_state.briefing_em_edicao = briefing_editado
+                            st.success("✅ Briefing atualizado com sucesso!")
+                            st.rerun()
+                
+                with col_save2:
+                    if st.button("🔄 Restaurar Original", use_container_width=True):
+                        briefing_atual['briefing'] = briefing_atual.get('briefing_original', briefing_atual['briefing'])
+                        st.session_state.briefing_em_edicao = None
+                        st.success("✅ Briefing original restaurado!")
+                        st.rerun()
+                
+                # ============================================
+                # HISTÓRICO DE AJUSTES
+                # ============================================
+                if briefing_atual.get('historico_ajustes'):
+                    with st.expander("📋 Histórico de Ajustes Realizados"):
+                        for i, ajuste in enumerate(briefing_atual['historico_ajustes']):
+                            data_ajuste = ajuste.get('data', '')
+                            if isinstance(data_ajuste, datetime.datetime):
+                                data_str = data_ajuste.strftime('%d/%m/%Y %H:%M:%S')
+                            else:
+                                data_str = 'Data desconhecida'
+                            
+                            st.write(f"**{i+1}. {data_str}**")
+                            st.write(f"*Solicitação:* {ajuste['solicitacao']}")
+                            st.divider()
+                
+                # ============================================
+                # BOTÕES DE DOWNLOAD
+                # ============================================
+                st.markdown("---")
+                col_dl1, col_dl2, col_dl3 = st.columns(3)
+                
+                with col_dl1:
+                    # Download individual
+                    nome_arquivo = f"briefing_{briefing_atual['indice']}.txt"
+                    if 'titulo' in briefing_atual:
+                        nome_arquivo = f"briefing_{briefing_atual['titulo'].replace(' ', '_')}.txt"
+                    
+                    st.download_button(
+                        "💾 Baixar Este Briefing",
+                        data=briefing_atual['briefing'],
+                        file_name=nome_arquivo,
+                        mime="text/plain",
+                        use_container_width=True
+                    )
+                
+                with col_dl2:
+                    # Download com histórico
+                    if briefing_atual.get('historico_ajustes'):
+                        briefing_com_historico = f"""# BRIEFING {briefing_atual['indice']}
+                        
+## INFORMAÇÕES ORIGINAIS
+- Título/Pauta: {briefing_atual.get('titulo', briefing_atual.get('conteudo_original', 'N/A'))}
+- Mês referência: {briefing_atual.get('mes_referencia', 'N/A')}
 
-# ... (código anterior permanece o mesmo até a definição da aba de revisão técnica sem RAG)
+## BRIEFING ATUAL
+{briefing_atual['briefing']}
 
+## HISTÓRICO DE AJUSTES
+"""
+                        for i, ajuste in enumerate(briefing_atual['historico_ajustes'], 1):
+                            data_ajuste = ajuste.get('data', '')
+                            if isinstance(data_ajuste, datetime.datetime):
+                                data_str = data_ajuste.strftime('%d/%m/%Y %H:%M:%S')
+                            else:
+                                data_str = 'Data desconhecida'
+                            
+                            briefing_com_historico += f"\n{i}. {data_str}\n"
+                            briefing_com_historico += f"   Solicitação: {ajuste['solicitacao']}\n"
+                        
+                        st.download_button(
+                            "📋 Baixar com Histórico",
+                            data=briefing_com_historico,
+                            file_name=f"briefing_{briefing_atual['indice']}_com_historico.txt",
+                            mime="text/plain",
+                            use_container_width=True
+                        )
+                
+                with col_dl3:
+                    # Download em lote (todos os briefings)
+                    if len(briefings) > 1:
+                        import zipfile
+                        import io
+                        
+                        zip_buffer = io.BytesIO()
+                        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                            for b in briefings:
+                                nome_b = f"briefing_{b['indice']}.txt"
+                                if 'titulo' in b:
+                                    nome_b = f"briefing_{b['titulo'].replace(' ', '_')}.txt"
+                                zip_file.writestr(nome_b, b['briefing'])
+                            
+                            # Arquivo consolidado
+                            consolidado = f"TODOS OS BRIEFINGS\n"
+                            consolidado += f"Total: {len(briefings)}\n"
+                            consolidado += "="*60 + "\n\n"
+                            
+                            for b in briefings:
+                                consolidado += f"BRIEFING {b['indice']}\n"
+                                if 'titulo' in b:
+                                    consolidado += f"Título: {b['titulo']}\n"
+                                else:
+                                    consolidado += f"Pauta: {b['conteudo_original']}\n"
+                                consolidado += "-"*40 + "\n"
+                                consolidado += f"{b['briefing']}\n"
+                                consolidado += "="*60 + "\n\n"
+                            
+                            zip_file.writestr("briefings_consolidados.txt", consolidado)
+                        
+                        st.download_button(
+                            "📦 Baixar Todos (ZIP)",
+                            data=zip_buffer.getvalue(),
+                            file_name=f"todos_briefings_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.zip",
+                            mime="application/zip",
+                            use_container_width=True
+                        )
 with tab_revisao_tecnica2:
     st.header("🔬 Revisão Técnica Completa")
     st.markdown("**Análise rigorosa com expertise técnica em agronomia**")
