@@ -1447,7 +1447,7 @@ with tab_blog:
         st.error(f"❌ Erro na conexão com MongoDB: {str(e)}")
         mongo_connected_blog_rag = False
     
-    # Estado da sessão
+    # Estado da sessão - INICIALIZAR TODAS AS VARIÁVEIS
     if 'conteudo_gerado_blog' not in st.session_state:
         st.session_state.conteudo_gerado_blog = None
     if 'versoes_blog' not in st.session_state:
@@ -1456,12 +1456,10 @@ with tab_blog:
         st.session_state.relatorio_fontes_blog = None
     if 'briefing_original_blog' not in st.session_state:
         st.session_state.briefing_original_blog = None
-    if 'modo_visualizacao_blog' not in st.session_state:
-        st.session_state.modo_visualizacao_blog = "unico"  # "unico" ou "lado_a_lado"
-    if 'conteudo_ajustado_blog' not in st.session_state:
-        st.session_state.conteudo_ajustado_blog = None
-    if 'ultimo_ajuste_solicitado' not in st.session_state:
-        st.session_state.ultimo_ajuste_solicitado = None
+    if 'fontes_perplexity_blog' not in st.session_state:
+        st.session_state.fontes_perplexity_blog = []
+    if 'usou_perplexity_blog' not in st.session_state:
+        st.session_state.usou_perplexity_blog = False
     
     # ============================================
     # 2. INTERFACE SIMPLIFICADA - ÚNICA CAIXA DE TEXTO
@@ -1606,7 +1604,7 @@ Contexto do mês: Fevereiro - período de desenvolvimento vegetativo da soja no 
                                 prompt_busca = f"""
                                 Você é um pesquisador agrícola. Busque informações técnicas atualizadas e confiáveis sobre:
                                 
-                                {briefing}
+                                {briefing[:800]}
                                 
                                 REQUISITOS:
                                 1. Fontes: Embrapa, universidades, artigos científicos, boletins técnicos
@@ -1670,13 +1668,19 @@ Contexto do mês: Fevereiro - período de desenvolvimento vegetativo da soja no 
                         
                         if usar_perplexity_blog:
                             with st.spinner("🌐 Buscando informações atualizadas na web..."):
-                                resultados_perplexity = buscar_perplexity_blog(texto_briefing, profundidade_busca)
+                                resultados_perplexity = buscar_perplexity_blog(texto_briefing, profundidade_busca if 'profundidade_busca' in locals() else "Avançada")
                                 
                                 if resultados_perplexity.get('erro'):
                                     st.warning(f"⚠️ Busca web: {resultados_perplexity['erro']}")
                                 else:
                                     fontes_count = len(resultados_perplexity.get('fontes', []))
                                     st.success(f"✅ {fontes_count} fontes encontradas na web")
+                                    
+                                    # Salvar no session state
+                                    st.session_state.fontes_perplexity_blog = resultados_perplexity.get('fontes', [])
+                                    st.session_state.usou_perplexity_blog = True
+                        else:
+                            st.session_state.usou_perplexity_blog = False
                         
                         # ============================================
                         # 7. CONTEXTO DO AGENTE
@@ -1743,156 +1747,50 @@ Contexto do mês: Fevereiro - período de desenvolvimento vegetativo da soja no 
                            - EXPLIQUE o modo de ação, não apenas o nome
                            - MOSTRE resultados com dados de eficácia
                            - CONCLUA com recomendações práticas e CTA
-
-                        **6 POSICIONAMENTO DO PRODUTO:
-                            - não apenas descreva o produto; o posicione como solução; construa uma narrativa estratégica sobre seu uso, beneficios, etc
                         
                         ---
                         
                         ## ESTRUTURA SUGERIDA (ADAPTE CONFORME O BRIEFING):
                         
-                        Estrutura da Página (A Arquitetura)
-
-A página é construída como uma sequência de blocos modulares. Cada bloco tem uma função específica na jornada do visitante, que vai do primeiro contato até o aprofundamento técnico e a conversão (ou engajamento).
-
-    Bloco de Hero (Identidade e Proposta de Valor)
-
-        Função: Apresentar o produto e seu principal diferencial de forma imediata.
-
-        Elementos: Título principal (H1) e parágrafo introdutório.
-
-        Posição: Topo da página.
-
-    Bloco de Multimídia (Engajamento Inicial)
-
-        Função: Oferecer um conteúdo dinâmico (vídeo) para explicar o conceito de forma rápida e aumentar o tempo de permanência na página.
-
-        Elementos: Título secundário (H2) e player de vídeo incorporado.
-
-        Posição: Logo após o Hero.
-
-    Bloco de Benefícios (Visão Geral)
-
-        Função: Listar visualmente os principais ganhos ou pilares do produto.
-
-        Elementos: Título secundário (H2) e elementos gráficos (ícones ou cards).
-
-        Posição: Antes do detalhamento técnico.
-
-    Bloco de Explicação do Conceito (Detalhamento do Diferencial)
-
-        Função: Explicar em profundidade o conceito central do produto, geralmente dividido em tópicos.
-
-        Elementos: Título secundário (H2), subtítulos (H3) e parágrafos descritivos para cada tópico.
-
-        Posição: Após a visão geral dos benefícios.
-
-    Bloco de Evidências e Resultados (Prova Social)
-
-        Função: Apresentar dados, estatísticas ou estudos de caso que comprovem a eficácia.
-
-        Elementos: Título secundário (H2) e parágrafos com dados numéricos ou comparativos.
-
-        Posição: Antes das características técnicas.
-
-    Bloco de Características Técnicas (Modo de Uso e Ação)
-
-        Função: Informar como o produto funciona, suas formas de aplicação, composição e compatibilidade.
-
-        Elementos: Título secundário (H2) e parágrafos informativos.
-
-        Posição: Próximo ao final do conteúdo principal.
-
-    Bloco de Conteúdos Relacionados (Prolongamento da Visita)
-
-        Função: Direcionar o visitante para o blog ou central de conteúdo, aprofundando temas relacionados.
-
-        Elementos: Título secundário (H2) e links para artigos.
-
-        Posição: Antes do rodapé ou portfólio.
-
-    Bloco de Portfólio (Cross-Selling)
-
-        Função: Apresentar outros produtos da marca para aumentar o interesse e o tempo de navegação.
-
-        Elementos: Título secundário (H2) e lista de produtos relacionados.
-
-        Posição: Antes do bloco de canais.
-
-    Bloco de Canais e Contato (Relacionamento)
-
-        Função: Oferecer acesso a outros pontos de contato com a empresa (redes sociais, SAC).
-
-        Elementos: Links ou ícones de navegação.
-
-        Posição: Região de rodapé ou pré-rodapé.
-
-    Bloco de Perguntas Frequentes (Otimização para Buscas)
-
-        Função: Responder às dúvidas específicas dos usuários e melhorar o ranqueamento nos mecanismos de busca (SEO).
-
-        Elementos: Logo do produto, sequência de perguntas e respostas diretas.
-
-        Posição: Final da página, antes do rodapé institucional.
-
-Forma de Escrever (As Diretrizes de Redação)
-Tom de Voz Geral
-
-    Institucional e Autoritário: A linguagem deve transmitir confiança e conhecimento técnico.
-
-    Informativo e Persuasivo: O texto deve educar o visitante sobre o problema e, ao mesmo tempo, convencê-lo de que esta é a melhor solução.
-
-    Acessível: Embora técnico, o texto deve ser compreensível para o público-alvo (produtores rurais, agrônomos).
-
-Diretrizes por Elemento
-
-1. Título Principal (H1)
-
-    Deve conter obrigatoriamente o nome do produto.
-
-    Deve ser uma combinação direta entre "o que é" e o "principal benefício".
-
-    A estrutura deve ser clara e objetiva, funcionando como a frase de impacto que resume a página.
-
-2. Parágrafo Introdutório
-
-    Começar com uma afirmação que posicione o produto como uma inovação ou uma solução para um problema grave.
-
-    Explicar sucintamente o mecanismo de ação ou o conceito principal.
-
-    Entregar um benefício tangível e mensurável (dado de produtividade, redução de perdas) para gerar interesse imediato.
-
-3. Títulos Secundários (H2)
-
-    Funcionam como "ganchos" para cada seção.
-
-    Geralmente iniciam com verbos no infinitivo ou no imperativo que indicam uma ação por parte do leitor (Conhecer, Entender, Descobrir, Confiar) ou uma promessa de conteúdo (Os benefícios, Os resultados, A tecnologia).
-
-    Servem para organizar a jornada do usuário, indicando claramente o assunto do bloco que se segue.
-
-4. Parágrafos Descritivos (Corpo do Texto)
-
-    Estrutura Interna: Cada parágrafo deve defender uma ideia central.
-
-    Abordagem: Utilizar uma progressão lógica. Explicar o contexto (o problema), apresentar a ação do produto (a solução) e descrever o resultado final (o benefício).
-
-    Tom Técnico: Utilizar terminologia específica do setor para construir credibilidade, mas contextualizando-a para não perder o leitor.
-
-    Ritmo: Alternar entre parágrafos mais longos (explicações de conceitos) e frases mais curtas ou listas implícitas (características e benefícios) para tornar a leitura dinâmica.
-
-5. Subtítulos (H3)
-
-    Usados exclusivamente para quebrar um conceito grande em partes menores e organizadas (ex: os pilares de uma tecnologia, os tipos de proteção).
-
-    Criam uma hierarquia visual clara, facilitando a leitura de blocos de texto mais densos.
-
-6. Bloco de Perguntas e Respostas (SEO)
-
-    Perguntas: Devem ser construídas como se fossem feitas pelo usuário, iniciando com pronomes interrogativos (Qual, Quais, Como, Quando, Onde, Para que).
-
-    Respostas: Devam ser diretas, concisas e conter as palavras-chave mais importantes para ranqueamento.
-
-    A função deste bloco é capturar o tráfego de buscas específicas (cauda longa) e fornecer respostas rápidas sem que o usuário precise procurar no texto corrido.
+                        # [TÍTULO PRINCIPAL COM PALAVRA-CHAVE]
+                        
+                        [Introdução contextualizando o problema - 2-3 parágrafos curtos]
+                        
+                        ## [PROBLEMA/DESAFIO TÉCNICO]
+                        
+                        [Parágrafo explicando o problema]
+                        [Parágrafo com dados sobre impacto econômico/perdas]
+                        
+                        ### [Subtópico específico do problema - ex: Principais espécies]
+                        [Conteúdo com dados e fontes]
+                        
+                        ## [SOLUÇÕES/MANEJO]
+                        
+                        [Parágrafo introdutório sobre manejo integrado]
+                        
+                        ### [Produto/Solução 1]
+                        [O que é, modo de ação, benefícios, dados de eficácia, como aplicar]
+                        
+                        ### [Produto/Solução 2]
+                        [O que é, modo de ação, benefícios, dados de eficácia, como aplicar]
+                        
+                        ## [RESULTADOS E BENEFÍCIOS]
+                        
+                        [Parágrafos com dados de campo, resultados de pesquisa, depoimentos técnicos]
+                        
+                        ## [RECOMENDAÇÕES PRÁTICAS]
+                        
+                        [Orientações para implementação, época de aplicação, doses, cuidados]
+                        
+                        ## [CONCLUSÃO]
+                        
+                        [Resumo dos pontos principais e CTA]
+                        
+                        ---
+                        
+                        ## LISTA DE REFERÊNCIAS
+                        
+                        [Listar todas as fontes utilizadas ao longo do texto]
                         
                         ---
                         
@@ -1961,7 +1859,7 @@ Diretrizes por Elemento
     if st.session_state.conteudo_gerado_blog:
         st.markdown("---")
         
-        # Métricas
+        # Métricas - USANDO SESSION STATE EM VEZ DE VARIÁVEIS LOCAIS
         palavras_count = len(st.session_state.conteudo_gerado_blog.split())
         
         col_m1, col_m2, col_m3, col_m4 = st.columns(4)
@@ -1971,205 +1869,33 @@ Diretrizes por Elemento
             versoes = len(st.session_state.versoes_blog)
             st.metric("📋 Versões", versoes)
         with col_m3:
-            st.metric("🎯 Tom", tom_voz if 'tom_voz' in locals() else "Técnico")
+            # Pegar tom_voz do session state ou usar padrão
+            tom_exibicao = st.session_state.get('tom_voz_blog', 'Técnico-científico')
+            st.metric("🎯 Tom", tom_exibicao)
         with col_m4:
-            st.metric("🌐 Fontes", "✅" if usar_perplexity_blog and resultados_perplexity.get('fontes') else "❌")
+            # Usar session state para verificar se usou perplexity
+            usou_perplexity = st.session_state.get('usou_perplexity_blog', False)
+            tem_fontes = len(st.session_state.get('fontes_perplexity_blog', [])) > 0
+            st.metric("🌐 Fontes", "✅" if usou_perplexity and tem_fontes else "❌")
         
-        # ============================================
-        # 11. SEÇÃO DE AJUSTES PONTUAIS (NOVA)
-        # ============================================
-        st.markdown("---")
-        st.subheader("🔄 Ajustes Pontuais")
-        st.markdown("**Descreva o que deseja alterar. A estrutura original será preservada.**")
+        # Abas para visualização
+        tab_conteudo, tab_ref, tab_versoes, tab_export = st.tabs([
+            "📝 Conteúdo Gerado", "📚 Referências", "📋 Histórico", "💾 Exportar"
+        ])
         
-        # Opção de visualização
-        col_view1, col_view2 = st.columns([1, 3])
-        with col_view1:
-            modo_visualizacao = st.radio(
-                "Modo de visualização:",
-                ["Único", "Lado a lado"],
-                horizontal=True,
-                key="modo_visualizacao_blog_radio",
-                index=0 if st.session_state.modo_visualizacao_blog == "unico" else 1
-            )
-            st.session_state.modo_visualizacao_blog = "unico" if modo_visualizacao == "Único" else "lado_a_lado"
-        
-        with col_view2:
-            st.markdown("#####")  # Espaçamento
-        
-        # Campos para ajuste
-        col_ajuste1, col_ajuste2 = st.columns([3, 1])
-        
-        with col_ajuste1:
-            solicitacao_ajuste = st.text_area(
-                "Descreva os ajustes pontuais desejados:",
-                placeholder="""Exemplos de ajustes pontuais:
-- No parágrafo sobre modo de ação, substitua 'fungicida sistêmico' por 'fungicida mesostêmico'
-- Na seção de resultados, adicione o dado: 'Aumento de produtividade de 15% em campos tratados'
-- Corrija o nome do produto na terceira seção: onde está 'NemaControl' deveria ser 'NemaControl Pro'
-- Adicione uma nota sobre a importância da rotação de mecanismos de ação
-- No título H2 da segunda seção, mude de 'Benefícios' para 'Vantagens técnicas comprovadas'
-- Remova o bullet point sobre custo na lista de benefícios
-- Substitua a fonte da Embrapa na citação sobre eficácia pela fonte correta (Circular Técnica 123/2024)
-- Adicione um parágrafo sobre o momento ideal de aplicação após a seção de características""",
-                height=150,
-                key="campo_ajuste_blog"
-            )
-        
-        with col_ajuste2:
-            st.markdown("#####")
-            if st.button("✅ APLICAR AJUSTE PONTUAL", type="secondary", use_container_width=True):
-                if solicitacao_ajuste.strip():
-                    with st.spinner("🔄 Aplicando ajuste preservando estrutura..."):
-                        try:
-                            # Preparar prompt de ajuste pontual com preservação de estrutura
-                            prompt_ajuste_pontual = f"""
-                            ## INSTRUÇÕES CRÍTICAS: AJUSTE PONTUAL PRESERVANDO ESTRUTURA
-
-                            ### CONTEÚDO ATUAL (ORIGINAL):
-                            {st.session_state.conteudo_gerado_blog}
-
-                            ### AJUSTE SOLICITADO PELO USUÁRIO:
-                            "{solicitacao_ajuste}"
-
-                            ### REGRAS ABSOLUTAS:
-
-                            1. **PRESERVE A ESTRUTURA COMPLETA DO TEXTO ORIGINAL**
-                               - Mantenha TODOS os títulos, subtítulos, seções e sua ordem
-                               - Mantenha TODOS os parágrafos no mesmo lugar
-                               - Mantenha TODAS as marcações de formatação (negrito, itálico, bullets)
-                               - A estrutura geral deve ser IDÊNTICA ao original
-
-                            2. **ALTERE APENAS O ESTRITAMENTE SOLICITADO**
-                               - Se o usuário pediu para substituir uma palavra/frase, substitua APENAS essa palavra/frase
-                               - Se o usuário pediu para adicionar uma informação, adicione APENAS essa informação no local mais apropriado SEM ALTERAR a estrutura ao redor
-                               - Se o usuário pediu para remover algo, remova APENAS o trecho especificado
-                               - TODO o resto do texto deve permanecer EXATAMENTE IGUAL
-
-                            3. **IDENTIFICAÇÃO PRECISA DOS TRECHOS**
-                               - Localize EXATAMENTE o trecho que precisa ser modificado
-                               - Use o texto exato do original como referência
-                               - Não faça alterações além do solicitado
-
-                            4. **EXEMPLOS DE AJUSTES PONTUAIS E COMO APLICAR:**
-                               
-                               *Para substituição:* 
-                               - Original: "O fungicida sistêmico age rapidamente"
-                               - Solicitação: "Substitua 'sistêmico' por 'mesostêmico'"
-                               - Resultado: "O fungicida mesostêmico age rapidamente"
-                               
-                               *Para adição:* 
-                               - Original: "A eficácia do produto é de 85%"
-                               - Solicitação: "Adicione 'em condições de campo' após eficácia"
-                               - Resultado: "A eficácia do produto em condições de campo é de 85%"
-                               
-                               *Para inserção de novo parágrafo:*
-                               - Solicitação: "Adicione um parágrafo sobre manejo integrado após a seção de resultados"
-                               - Ação: Insira o novo conteúdo na posição solicitada sem alterar o existente
-
-                            ### SUA TAREFA:
-                            1. IDENTIFIQUE o trecho exato a ser modificado
-                            2. APLIQUE a modificação com precisão cirúrgica
-                            3. MANTENHA TODO o resto do texto completamente inalterado
-                            4. RETORNE APENAS O TEXTO COMPLETO COM A MODIFICAÇÃO APLICADA
-
-                            **IMPORTANTE:** O texto retornado deve ser IDÊNTICO ao original, EXCETO pela modificação pontual solicitada.
-
-                            RETORNE APENAS O TEXTO AJUSTADO, SEM COMENTÁRIOS ADICIONAIS.
-                            """
-                            
-                            resposta_ajuste = modelo_texto.generate_content(prompt_ajuste_pontual)
-                            conteudo_ajustado = resposta_ajuste.text.strip()
-                            
-                            # Salvar versão anterior no histórico
-                            nova_versao = {
-                                "versao": len(st.session_state.versoes_blog) + 1,
-                                "conteudo": st.session_state.conteudo_gerado_blog,
-                                "data": datetime.datetime.now(),
-                                "descricao": f"Ajuste pontual: {solicitacao_ajuste[:100]}..."
-                            }
-                            st.session_state.versoes_blog.append(nova_versao)
-                            
-                            # Salvar o conteúdo ajustado separadamente
-                            st.session_state.conteudo_ajustado_blog = conteudo_ajustado
-                            st.session_state.ultimo_ajuste_solicitado = solicitacao_ajuste
-                            
-                            # NÃO atualizar o conteúdo principal automaticamente - manter ambos
-                            st.success("✅ Ajuste aplicado! Visualize abaixo as diferenças.")
-                            st.rerun()
-                            
-                        except Exception as e:
-                            st.error(f"❌ Erro ao aplicar ajuste: {str(e)}")
-                else:
-                    st.warning("⚠️ Descreva os ajustes desejados.")
-        
-        # ============================================
-        # 12. VISUALIZAÇÃO DOS RESULTADOS (COM LADO A LADO SE HOUVER AJUSTE)
-        # ============================================
-        
-        # Definir qual conteúdo mostrar baseado no modo de visualização
-        if st.session_state.modo_visualizacao_blog == "lado_a_lado" and st.session_state.conteudo_ajustado_blog:
-            # Modo lado a lado - mostrar original e ajustado
-            st.markdown("### 📊 Comparação: Original vs Ajustado")
-            
-            col_orig, col_ajust = st.columns(2)
-            
-            with col_orig:
-                st.markdown("**📄 Conteúdo Original**")
-                with st.container(height=500, border=True):
-                    st.markdown(st.session_state.conteudo_gerado_blog)
-            
-            with col_ajust:
-                st.markdown("**✨ Conteúdo com Ajustes Pontuais**")
-                with st.container(height=500, border=True):
-                    st.markdown(st.session_state.conteudo_ajustado_blog)
-            
-            # Botões para gerenciar versões
-            col_btn_orig, col_btn_ajust, col_btn_cancel = st.columns(3)
-            
-            with col_btn_orig:
-                if st.button("✅ Manter Original", key="manter_original", use_container_width=True):
-                    st.session_state.conteudo_ajustado_blog = None
-                    st.session_state.modo_visualizacao_blog = "unico"
-                    st.rerun()
-            
-            with col_btn_ajust:
-                if st.button("✅ Aceitar Versão Ajustada", key="aceitar_ajustada", type="primary", use_container_width=True):
-                    st.session_state.conteudo_gerado_blog = st.session_state.conteudo_ajustado_blog
-                    st.session_state.conteudo_ajustado_blog = None
-                    st.session_state.modo_visualizacao_blog = "unico"
-                    st.success("✅ Versão ajustada incorporada ao conteúdo principal!")
-                    st.rerun()
-            
-            with col_btn_cancel:
-                if st.button("❌ Descartar Ajuste", key="descartar_ajuste", use_container_width=True):
-                    st.session_state.conteudo_ajustado_blog = None
-                    st.session_state.modo_visualizacao_blog = "unico"
-                    st.rerun()
-        
-        else:
-            # Modo único - mostrar o conteúdo principal
-            st.markdown("### 📝 Conteúdo Gerado")
-            with st.container(height=500, border=True):
-                st.markdown(st.session_state.conteudo_gerado_blog)
-        
-        # ============================================
-        # 13. REFERÊNCIAS E EXPORTAÇÃO
-        # ============================================
-        
-        # Abas para referências, histórico e exportação
-        tab_ref, tab_versoes, tab_export = st.tabs(["📚 Referências", "📋 Histórico de Versões", "💾 Exportar"])
+        with tab_conteudo:
+            st.markdown(st.session_state.conteudo_gerado_blog)
         
         with tab_ref:
             if st.session_state.relatorio_fontes_blog:
                 st.markdown(st.session_state.relatorio_fontes_blog)
             else:
-                st.info("Nenhuma referência disponível.")
+                st.info("Nenhuma referência disponível")
         
         with tab_versoes:
             if st.session_state.versoes_blog:
                 for versao in reversed(st.session_state.versoes_blog[-5:]):
-                    with st.expander(f"Versão {versao['versao']} - {versao['data'].strftime('%d/%m/%Y %H:%M')} - {versao['descricao']}"):
+                    with st.expander(f"Versão {versao['versao']} - {versao['data'].strftime('%d/%m/%Y %H:%M') if isinstance(versao['data'], datetime.datetime) else 'Data desconhecida'} - {versao['descricao']}"):
                         st.text_area(
                             f"Conteúdo da versão {versao['versao']}",
                             value=versao['conteudo'][:500] + "..." if len(versao['conteudo']) > 500 else versao['conteudo'],
@@ -2179,33 +1905,19 @@ Diretrizes por Elemento
                         
                         if st.button(f"Restaurar versão {versao['versao']}", key=f"restore_{versao['versao']}"):
                             st.session_state.conteudo_gerado_blog = versao['conteudo']
-                            st.session_state.conteudo_ajustado_blog = None
                             st.success(f"✅ Versão {versao['versao']} restaurada!")
                             st.rerun()
             else:
-                st.info("Nenhum histórico disponível.")
+                st.info("Nenhuma versão disponível")
         
         with tab_export:
             col_exp1, col_exp2 = st.columns(2)
             
             with col_exp1:
                 # TXT
-                conteudo_para_exportar = st.session_state.conteudo_gerado_blog
-                if st.session_state.conteudo_ajustado_blog:
-                    conteudo_para_exportar = st.radio(
-                        "Selecionar versão para exportar:",
-                        ["Original", "Ajustada"],
-                        horizontal=True,
-                        key="versao_export"
-                    )
-                    if conteudo_para_exportar == "Ajustada":
-                        conteudo_para_exportar = st.session_state.conteudo_ajustado_blog
-                    else:
-                        conteudo_para_exportar = st.session_state.conteudo_gerado_blog
-                
                 st.download_button(
                     "📥 Baixar como TXT",
-                    data=conteudo_para_exportar,
+                    data=st.session_state.conteudo_gerado_blog,
                     file_name=f"blog_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
                     mime="text/plain",
                     use_container_width=True
@@ -2214,7 +1926,7 @@ Diretrizes por Elemento
                 # MD
                 st.download_button(
                     "📥 Baixar como MD",
-                    data=conteudo_para_exportar,
+                    data=st.session_state.conteudo_gerado_blog,
                     file_name=f"blog_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.md",
                     mime="text/markdown",
                     use_container_width=True
@@ -2237,16 +1949,11 @@ Diretrizes por Elemento
 ## BRIEFING ORIGINAL
 {st.session_state.briefing_original_blog if st.session_state.briefing_original_blog else 'N/A'}
 
-## CONTEÚDO ORIGINAL
+## CONTEÚDO GERADO
 {st.session_state.conteudo_gerado_blog}
-
-{f"## CONTEÚDO COM AJUSTES PONTUAIS\n{st.session_state.conteudo_ajustado_blog}\n\n" if st.session_state.conteudo_ajustado_blog else ""}
 
 ## REFERÊNCIAS
 {st.session_state.relatorio_fontes_blog if st.session_state.relatorio_fontes_blog else 'N/A'}
-
-## ÚLTIMO AJUSTE SOLICITADO
-{st.session_state.ultimo_ajuste_solicitado if st.session_state.ultimo_ajuste_solicitado else 'Nenhum ajuste realizado'}
 """
                 st.download_button(
                     "📦 Pacote Completo",
@@ -2255,9 +1962,77 @@ Diretrizes por Elemento
                     mime="text/plain",
                     use_container_width=True
                 )
+        
+        # ============================================
+        # 11. SEÇÃO DE AJUSTES
+        # ============================================
+        
+        st.markdown("---")
+        st.subheader("🔄 Ajustar Conteúdo")
+        
+        col_ajuste1, col_ajuste2 = st.columns([3, 1])
+        
+        with col_ajuste1:
+            solicitacao_ajuste = st.text_area(
+                "Descreva os ajustes desejados:",
+                placeholder="Exemplos:\n- Aprofunde mais na seção sobre modo de ação dos produtos\n- Adicione mais dados de eficácia com fontes\n- Melhore a narrativa, conectando melhor problema e solução\n- Quebre parágrafos longos no início\n- Inclua mais informações sobre a cultura alvo\n- Aumente a densidade da palavra-chave 'manejo de nematoides'\n- Adicione um CTA mais forte no final",
+                height=100,
+                key="campo_ajuste_blog"
+            )
+        
+        with col_ajuste2:
+            st.markdown("#####")
+            if st.button("✅ APLICAR AJUSTES", type="secondary", use_container_width=True):
+                if solicitacao_ajuste.strip():
+                    with st.spinner("🔄 Aplicando ajustes..."):
+                        try:
+                            # Preparar prompt de ajuste
+                            prompt_ajuste = f"""
+                            ## CONTEÚDO ATUAL:
+                            {st.session_state.conteudo_gerado_blog}
+                            
+                            ## BRIEFING ORIGINAL:
+                            {st.session_state.briefing_original_blog if st.session_state.briefing_original_blog else 'N/A'}
+                            
+                            ## AJUSTES SOLICITADOS:
+                            {solicitacao_ajuste}
+                            
+                            ## INSTRUÇÕES:
+                            1. APLIQUE os ajustes solicitados mantendo a estrutura geral
+                            2. APROFUNDE o conteúdo técnico quando necessário
+                            3. QUEBRE parágrafos longos
+                            4. MANTENHA as fontes e referências
+                            5. MELHORE a narrativa se solicitado
+                            6. POSICIONE os produtos de forma estratégica
+                            
+                            RETORNE APENAS O CONTEÚDO AJUSTADO.
+                            """
+                            
+                            resposta_ajuste = modelo_texto.generate_content(prompt_ajuste)
+                            conteudo_ajustado = resposta_ajuste.text
+                            
+                            # Salvar versão anterior
+                            nova_versao = {
+                                "versao": len(st.session_state.versoes_blog) + 1,
+                                "conteudo": st.session_state.conteudo_gerado_blog,
+                                "data": datetime.datetime.now(),
+                                "descricao": f"Ajuste: {solicitacao_ajuste[:50]}..."
+                            }
+                            st.session_state.versoes_blog.append(nova_versao)
+                            
+                            # Atualizar conteúdo atual
+                            st.session_state.conteudo_gerado_blog = conteudo_ajustado
+                            
+                            st.success("✅ Ajustes aplicados com sucesso!")
+                            st.rerun()
+                            
+                        except Exception as e:
+                            st.error(f"❌ Erro ao aplicar ajustes: {str(e)}")
+                else:
+                    st.warning("⚠️ Descreva os ajustes desejados.")
     
     # ============================================
-    # 14. HISTÓRICO DE GERAÇÕES
+    # 12. HISTÓRICO DE GERAÇÕES
     # ============================================
     
     if mongo_connected_blog_rag:
@@ -2269,14 +2044,13 @@ Diretrizes por Elemento
             
             if historico:
                 for post in historico:
-                    with st.expander(f"📄 {post.get('data_criacao', '').strftime('%d/%m/%Y %H:%M')} - Briefing: {post.get('briefing', '')[:100]}..."):
+                    with st.expander(f"📄 {post.get('data_criacao', '').strftime('%d/%m/%Y %H:%M') if post.get('data_criacao') else 'Data desconhecida'} - Briefing: {post.get('briefing', '')[:100]}..."):
                         st.write(f"**Palavras:** {len(post.get('conteudo', '').split())}")
                         st.write(f"**Fontes:** {len(post.get('fontes', []))}")
                         
                         if st.button(f"Carregar este post", key=f"load_{post.get('_id')}"):
                             st.session_state.conteudo_gerado_blog = post.get('conteudo', '')
                             st.session_state.briefing_original_blog = post.get('briefing', '')
-                            st.session_state.conteudo_ajustado_blog = None
                             st.success("✅ Post carregado!")
                             st.rerun()
             else:
