@@ -1742,45 +1742,148 @@ Contexto do mês: Fevereiro - período de desenvolvimento vegetativo da soja no 
                         
                         ## ESTRUTURA SUGERIDA (ADAPTE CONFORME O BRIEFING):
                         
-                        # [TÍTULO PRINCIPAL COM PALAVRA-CHAVE]
-                        
-                        [Introdução contextualizando o problema - 2-3 parágrafos curtos]
-                        
-                        ## [PROBLEMA/DESAFIO TÉCNICO]
-                        
-                        [Parágrafo explicando o problema]
-                        [Parágrafo com dados sobre impacto econômico/perdas]
-                        
-                        ### [Subtópico específico do problema - ex: Principais espécies]
-                        [Conteúdo com dados e fontes]
-                        
-                        ## [SOLUÇÕES/MANEJO]
-                        
-                        [Parágrafo introdutório sobre manejo integrado]
-                        
-                        ### [Produto/Solução 1]
-                        [O que é, modo de ação, benefícios, dados de eficácia, como aplicar]
-                        
-                        ### [Produto/Solução 2]
-                        [O que é, modo de ação, benefícios, dados de eficácia, como aplicar]
-                        
-                        ## [RESULTADOS E BENEFÍCIOS]
-                        
-                        [Parágrafos com dados de campo, resultados de pesquisa, depoimentos técnicos]
-                        
-                        ## [RECOMENDAÇÕES PRÁTICAS]
-                        
-                        [Orientações para implementação, época de aplicação, doses, cuidados]
-                        
-                        ## [CONCLUSÃO]
-                        
-                        [Resumo dos pontos principais e CTA]
-                        
-                        ---
-                        
-                        ## LISTA DE REFERÊNCIAS
-                        
-                        [Listar todas as fontes utilizadas ao longo do texto]
+                        Estrutura da Página (A Arquitetura)
+
+A página é construída como uma sequência de blocos modulares. Cada bloco tem uma função específica na jornada do visitante, que vai do primeiro contato até o aprofundamento técnico e a conversão (ou engajamento).
+
+    Bloco de Hero (Identidade e Proposta de Valor)
+
+        Função: Apresentar o produto e seu principal diferencial de forma imediata.
+
+        Elementos: Título principal (H1) e parágrafo introdutório.
+
+        Posição: Topo da página.
+
+    Bloco de Multimídia (Engajamento Inicial)
+
+        Função: Oferecer um conteúdo dinâmico (vídeo) para explicar o conceito de forma rápida e aumentar o tempo de permanência na página.
+
+        Elementos: Título secundário (H2) e player de vídeo incorporado.
+
+        Posição: Logo após o Hero.
+
+    Bloco de Benefícios (Visão Geral)
+
+        Função: Listar visualmente os principais ganhos ou pilares do produto.
+
+        Elementos: Título secundário (H2) e elementos gráficos (ícones ou cards).
+
+        Posição: Antes do detalhamento técnico.
+
+    Bloco de Explicação do Conceito (Detalhamento do Diferencial)
+
+        Função: Explicar em profundidade o conceito central do produto, geralmente dividido em tópicos.
+
+        Elementos: Título secundário (H2), subtítulos (H3) e parágrafos descritivos para cada tópico.
+
+        Posição: Após a visão geral dos benefícios.
+
+    Bloco de Evidências e Resultados (Prova Social)
+
+        Função: Apresentar dados, estatísticas ou estudos de caso que comprovem a eficácia.
+
+        Elementos: Título secundário (H2) e parágrafos com dados numéricos ou comparativos.
+
+        Posição: Antes das características técnicas.
+
+    Bloco de Características Técnicas (Modo de Uso e Ação)
+
+        Função: Informar como o produto funciona, suas formas de aplicação, composição e compatibilidade.
+
+        Elementos: Título secundário (H2) e parágrafos informativos.
+
+        Posição: Próximo ao final do conteúdo principal.
+
+    Bloco de Conteúdos Relacionados (Prolongamento da Visita)
+
+        Função: Direcionar o visitante para o blog ou central de conteúdo, aprofundando temas relacionados.
+
+        Elementos: Título secundário (H2) e links para artigos.
+
+        Posição: Antes do rodapé ou portfólio.
+
+    Bloco de Portfólio (Cross-Selling)
+
+        Função: Apresentar outros produtos da marca para aumentar o interesse e o tempo de navegação.
+
+        Elementos: Título secundário (H2) e lista de produtos relacionados.
+
+        Posição: Antes do bloco de canais.
+
+    Bloco de Canais e Contato (Relacionamento)
+
+        Função: Oferecer acesso a outros pontos de contato com a empresa (redes sociais, SAC).
+
+        Elementos: Links ou ícones de navegação.
+
+        Posição: Região de rodapé ou pré-rodapé.
+
+    Bloco de Perguntas Frequentes (Otimização para Buscas)
+
+        Função: Responder às dúvidas específicas dos usuários e melhorar o ranqueamento nos mecanismos de busca (SEO).
+
+        Elementos: Logo do produto, sequência de perguntas e respostas diretas.
+
+        Posição: Final da página, antes do rodapé institucional.
+
+Forma de Escrever (As Diretrizes de Redação)
+Tom de Voz Geral
+
+    Institucional e Autoritário: A linguagem deve transmitir confiança e conhecimento técnico.
+
+    Informativo e Persuasivo: O texto deve educar o visitante sobre o problema e, ao mesmo tempo, convencê-lo de que esta é a melhor solução.
+
+    Acessível: Embora técnico, o texto deve ser compreensível para o público-alvo (produtores rurais, agrônomos).
+
+Diretrizes por Elemento
+
+1. Título Principal (H1)
+
+    Deve conter obrigatoriamente o nome do produto.
+
+    Deve ser uma combinação direta entre "o que é" e o "principal benefício".
+
+    A estrutura deve ser clara e objetiva, funcionando como a frase de impacto que resume a página.
+
+2. Parágrafo Introdutório
+
+    Começar com uma afirmação que posicione o produto como uma inovação ou uma solução para um problema grave.
+
+    Explicar sucintamente o mecanismo de ação ou o conceito principal.
+
+    Entregar um benefício tangível e mensurável (dado de produtividade, redução de perdas) para gerar interesse imediato.
+
+3. Títulos Secundários (H2)
+
+    Funcionam como "ganchos" para cada seção.
+
+    Geralmente iniciam com verbos no infinitivo ou no imperativo que indicam uma ação por parte do leitor (Conhecer, Entender, Descobrir, Confiar) ou uma promessa de conteúdo (Os benefícios, Os resultados, A tecnologia).
+
+    Servem para organizar a jornada do usuário, indicando claramente o assunto do bloco que se segue.
+
+4. Parágrafos Descritivos (Corpo do Texto)
+
+    Estrutura Interna: Cada parágrafo deve defender uma ideia central.
+
+    Abordagem: Utilizar uma progressão lógica. Explicar o contexto (o problema), apresentar a ação do produto (a solução) e descrever o resultado final (o benefício).
+
+    Tom Técnico: Utilizar terminologia específica do setor para construir credibilidade, mas contextualizando-a para não perder o leitor.
+
+    Ritmo: Alternar entre parágrafos mais longos (explicações de conceitos) e frases mais curtas ou listas implícitas (características e benefícios) para tornar a leitura dinâmica.
+
+5. Subtítulos (H3)
+
+    Usados exclusivamente para quebrar um conceito grande em partes menores e organizadas (ex: os pilares de uma tecnologia, os tipos de proteção).
+
+    Criam uma hierarquia visual clara, facilitando a leitura de blocos de texto mais densos.
+
+6. Bloco de Perguntas e Respostas (SEO)
+
+    Perguntas: Devem ser construídas como se fossem feitas pelo usuário, iniciando com pronomes interrogativos (Qual, Quais, Como, Quando, Onde, Para que).
+
+    Respostas: Devam ser diretas, concisas e conter as palavras-chave mais importantes para ranqueamento.
+
+    A função deste bloco é capturar o tráfego de buscas específicas (cauda longa) e fornecer respostas rápidas sem que o usuário precise procurar no texto corrido.
                         
                         ---
                         
