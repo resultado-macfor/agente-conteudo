@@ -1456,6 +1456,12 @@ with tab_blog:
         st.session_state.relatorio_fontes_blog = None
     if 'briefing_original_blog' not in st.session_state:
         st.session_state.briefing_original_blog = None
+    if 'modo_visualizacao_blog' not in st.session_state:
+        st.session_state.modo_visualizacao_blog = "unico"  # "unico" ou "lado_a_lado"
+    if 'conteudo_ajustado_blog' not in st.session_state:
+        st.session_state.conteudo_ajustado_blog = None
+    if 'ultimo_ajuste_solicitado' not in st.session_state:
+        st.session_state.ultimo_ajuste_solicitado = None
     
     # ============================================
     # 2. INTERFACE SIMPLIFICADA - ÚNICA CAIXA DE TEXTO
@@ -1966,16 +1972,196 @@ Diretrizes por Elemento
         with col_m4:
             st.metric("🌐 Fontes", "✅" if usar_perplexity_blog and resultados_perplexity.get('fontes') else "❌")
         
-        # Abas para visualização
-        tab_conteudo, tab_ref, tab_versoes, tab_export = st.tabs([
-            "📝 Conteúdo Gerado", "📚 Referências", "📋 Histórico", "💾 Exportar"
-        ])
+        # ============================================
+        # 11. SEÇÃO DE AJUSTES PONTUAIS (NOVA)
+        # ============================================
+        st.markdown("---")
+        st.subheader("🔄 Ajustes Pontuais")
+        st.markdown("**Descreva o que deseja alterar. A estrutura original será preservada.**")
         
-        with tab_conteudo:
-            st.markdown(st.session_state.conteudo_gerado_blog)
+        # Opção de visualização
+        col_view1, col_view2 = st.columns([1, 3])
+        with col_view1:
+            modo_visualizacao = st.radio(
+                "Modo de visualização:",
+                ["Único", "Lado a lado"],
+                horizontal=True,
+                key="modo_visualizacao_blog_radio",
+                index=0 if st.session_state.modo_visualizacao_blog == "unico" else 1
+            )
+            st.session_state.modo_visualizacao_blog = "unico" if modo_visualizacao == "Único" else "lado_a_lado"
+        
+        with col_view2:
+            st.markdown("#####")  # Espaçamento
+        
+        # Campos para ajuste
+        col_ajuste1, col_ajuste2 = st.columns([3, 1])
+        
+        with col_ajuste1:
+            solicitacao_ajuste = st.text_area(
+                "Descreva os ajustes pontuais desejados:",
+                placeholder="""Exemplos de ajustes pontuais:
+- No parágrafo sobre modo de ação, substitua 'fungicida sistêmico' por 'fungicida mesostêmico'
+- Na seção de resultados, adicione o dado: 'Aumento de produtividade de 15% em campos tratados'
+- Corrija o nome do produto na terceira seção: onde está 'NemaControl' deveria ser 'NemaControl Pro'
+- Adicione uma nota sobre a importância da rotação de mecanismos de ação
+- No título H2 da segunda seção, mude de 'Benefícios' para 'Vantagens técnicas comprovadas'
+- Remova o bullet point sobre custo na lista de benefícios
+- Substitua a fonte da Embrapa na citação sobre eficácia pela fonte correta (Circular Técnica 123/2024)
+- Adicione um parágrafo sobre o momento ideal de aplicação após a seção de características""",
+                height=150,
+                key="campo_ajuste_blog"
+            )
+        
+        with col_ajuste2:
+            st.markdown("#####")
+            if st.button("✅ APLICAR AJUSTE PONTUAL", type="secondary", use_container_width=True):
+                if solicitacao_ajuste.strip():
+                    with st.spinner("🔄 Aplicando ajuste preservando estrutura..."):
+                        try:
+                            # Preparar prompt de ajuste pontual com preservação de estrutura
+                            prompt_ajuste_pontual = f"""
+                            ## INSTRUÇÕES CRÍTICAS: AJUSTE PONTUAL PRESERVANDO ESTRUTURA
+
+                            ### CONTEÚDO ATUAL (ORIGINAL):
+                            {st.session_state.conteudo_gerado_blog}
+
+                            ### AJUSTE SOLICITADO PELO USUÁRIO:
+                            "{solicitacao_ajuste}"
+
+                            ### REGRAS ABSOLUTAS:
+
+                            1. **PRESERVE A ESTRUTURA COMPLETA DO TEXTO ORIGINAL**
+                               - Mantenha TODOS os títulos, subtítulos, seções e sua ordem
+                               - Mantenha TODOS os parágrafos no mesmo lugar
+                               - Mantenha TODAS as marcações de formatação (negrito, itálico, bullets)
+                               - A estrutura geral deve ser IDÊNTICA ao original
+
+                            2. **ALTERE APENAS O ESTRITAMENTE SOLICITADO**
+                               - Se o usuário pediu para substituir uma palavra/frase, substitua APENAS essa palavra/frase
+                               - Se o usuário pediu para adicionar uma informação, adicione APENAS essa informação no local mais apropriado SEM ALTERAR a estrutura ao redor
+                               - Se o usuário pediu para remover algo, remova APENAS o trecho especificado
+                               - TODO o resto do texto deve permanecer EXATAMENTE IGUAL
+
+                            3. **IDENTIFICAÇÃO PRECISA DOS TRECHOS**
+                               - Localize EXATAMENTE o trecho que precisa ser modificado
+                               - Use o texto exato do original como referência
+                               - Não faça alterações além do solicitado
+
+                            4. **EXEMPLOS DE AJUSTES PONTUAIS E COMO APLICAR:**
+                               
+                               *Para substituição:* 
+                               - Original: "O fungicida sistêmico age rapidamente"
+                               - Solicitação: "Substitua 'sistêmico' por 'mesostêmico'"
+                               - Resultado: "O fungicida mesostêmico age rapidamente"
+                               
+                               *Para adição:* 
+                               - Original: "A eficácia do produto é de 85%"
+                               - Solicitação: "Adicione 'em condições de campo' após eficácia"
+                               - Resultado: "A eficácia do produto em condições de campo é de 85%"
+                               
+                               *Para inserção de novo parágrafo:*
+                               - Solicitação: "Adicione um parágrafo sobre manejo integrado após a seção de resultados"
+                               - Ação: Insira o novo conteúdo na posição solicitada sem alterar o existente
+
+                            ### SUA TAREFA:
+                            1. IDENTIFIQUE o trecho exato a ser modificado
+                            2. APLIQUE a modificação com precisão cirúrgica
+                            3. MANTENHA TODO o resto do texto completamente inalterado
+                            4. RETORNE APENAS O TEXTO COMPLETO COM A MODIFICAÇÃO APLICADA
+
+                            **IMPORTANTE:** O texto retornado deve ser IDÊNTICO ao original, EXCETO pela modificação pontual solicitada.
+
+                            RETORNE APENAS O TEXTO AJUSTADO, SEM COMENTÁRIOS ADICIONAIS.
+                            """
+                            
+                            resposta_ajuste = modelo_texto.generate_content(prompt_ajuste_pontual)
+                            conteudo_ajustado = resposta_ajuste.text.strip()
+                            
+                            # Salvar versão anterior no histórico
+                            nova_versao = {
+                                "versao": len(st.session_state.versoes_blog) + 1,
+                                "conteudo": st.session_state.conteudo_gerado_blog,
+                                "data": datetime.datetime.now(),
+                                "descricao": f"Ajuste pontual: {solicitacao_ajuste[:100]}..."
+                            }
+                            st.session_state.versoes_blog.append(nova_versao)
+                            
+                            # Salvar o conteúdo ajustado separadamente
+                            st.session_state.conteudo_ajustado_blog = conteudo_ajustado
+                            st.session_state.ultimo_ajuste_solicitado = solicitacao_ajuste
+                            
+                            # NÃO atualizar o conteúdo principal automaticamente - manter ambos
+                            st.success("✅ Ajuste aplicado! Visualize abaixo as diferenças.")
+                            st.rerun()
+                            
+                        except Exception as e:
+                            st.error(f"❌ Erro ao aplicar ajuste: {str(e)}")
+                else:
+                    st.warning("⚠️ Descreva os ajustes desejados.")
+        
+        # ============================================
+        # 12. VISUALIZAÇÃO DOS RESULTADOS (COM LADO A LADO SE HOUVER AJUSTE)
+        # ============================================
+        
+        # Definir qual conteúdo mostrar baseado no modo de visualização
+        if st.session_state.modo_visualizacao_blog == "lado_a_lado" and st.session_state.conteudo_ajustado_blog:
+            # Modo lado a lado - mostrar original e ajustado
+            st.markdown("### 📊 Comparação: Original vs Ajustado")
+            
+            col_orig, col_ajust = st.columns(2)
+            
+            with col_orig:
+                st.markdown("**📄 Conteúdo Original**")
+                with st.container(height=500, border=True):
+                    st.markdown(st.session_state.conteudo_gerado_blog)
+            
+            with col_ajust:
+                st.markdown("**✨ Conteúdo com Ajustes Pontuais**")
+                with st.container(height=500, border=True):
+                    st.markdown(st.session_state.conteudo_ajustado_blog)
+            
+            # Botões para gerenciar versões
+            col_btn_orig, col_btn_ajust, col_btn_cancel = st.columns(3)
+            
+            with col_btn_orig:
+                if st.button("✅ Manter Original", key="manter_original", use_container_width=True):
+                    st.session_state.conteudo_ajustado_blog = None
+                    st.session_state.modo_visualizacao_blog = "unico"
+                    st.rerun()
+            
+            with col_btn_ajust:
+                if st.button("✅ Aceitar Versão Ajustada", key="aceitar_ajustada", type="primary", use_container_width=True):
+                    st.session_state.conteudo_gerado_blog = st.session_state.conteudo_ajustado_blog
+                    st.session_state.conteudo_ajustado_blog = None
+                    st.session_state.modo_visualizacao_blog = "unico"
+                    st.success("✅ Versão ajustada incorporada ao conteúdo principal!")
+                    st.rerun()
+            
+            with col_btn_cancel:
+                if st.button("❌ Descartar Ajuste", key="descartar_ajuste", use_container_width=True):
+                    st.session_state.conteudo_ajustado_blog = None
+                    st.session_state.modo_visualizacao_blog = "unico"
+                    st.rerun()
+        
+        else:
+            # Modo único - mostrar o conteúdo principal
+            st.markdown("### 📝 Conteúdo Gerado")
+            with st.container(height=500, border=True):
+                st.markdown(st.session_state.conteudo_gerado_blog)
+        
+        # ============================================
+        # 13. REFERÊNCIAS E EXPORTAÇÃO
+        # ============================================
+        
+        # Abas para referências, histórico e exportação
+        tab_ref, tab_versoes, tab_export = st.tabs(["📚 Referências", "📋 Histórico de Versões", "💾 Exportar"])
         
         with tab_ref:
-            st.markdown(st.session_state.relatorio_fontes_blog)
+            if st.session_state.relatorio_fontes_blog:
+                st.markdown(st.session_state.relatorio_fontes_blog)
+            else:
+                st.info("Nenhuma referência disponível.")
         
         with tab_versoes:
             if st.session_state.versoes_blog:
@@ -1990,17 +2176,33 @@ Diretrizes por Elemento
                         
                         if st.button(f"Restaurar versão {versao['versao']}", key=f"restore_{versao['versao']}"):
                             st.session_state.conteudo_gerado_blog = versao['conteudo']
+                            st.session_state.conteudo_ajustado_blog = None
                             st.success(f"✅ Versão {versao['versao']} restaurada!")
                             st.rerun()
+            else:
+                st.info("Nenhum histórico disponível.")
         
         with tab_export:
             col_exp1, col_exp2 = st.columns(2)
             
             with col_exp1:
                 # TXT
+                conteudo_para_exportar = st.session_state.conteudo_gerado_blog
+                if st.session_state.conteudo_ajustado_blog:
+                    conteudo_para_exportar = st.radio(
+                        "Selecionar versão para exportar:",
+                        ["Original", "Ajustada"],
+                        horizontal=True,
+                        key="versao_export"
+                    )
+                    if conteudo_para_exportar == "Ajustada":
+                        conteudo_para_exportar = st.session_state.conteudo_ajustado_blog
+                    else:
+                        conteudo_para_exportar = st.session_state.conteudo_gerado_blog
+                
                 st.download_button(
                     "📥 Baixar como TXT",
-                    data=st.session_state.conteudo_gerado_blog,
+                    data=conteudo_para_exportar,
                     file_name=f"blog_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.txt",
                     mime="text/plain",
                     use_container_width=True
@@ -2009,7 +2211,7 @@ Diretrizes por Elemento
                 # MD
                 st.download_button(
                     "📥 Baixar como MD",
-                    data=st.session_state.conteudo_gerado_blog,
+                    data=conteudo_para_exportar,
                     file_name=f"blog_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.md",
                     mime="text/markdown",
                     use_container_width=True
@@ -2032,11 +2234,16 @@ Diretrizes por Elemento
 ## BRIEFING ORIGINAL
 {st.session_state.briefing_original_blog if st.session_state.briefing_original_blog else 'N/A'}
 
-## CONTEÚDO GERADO
+## CONTEÚDO ORIGINAL
 {st.session_state.conteudo_gerado_blog}
+
+{f"## CONTEÚDO COM AJUSTES PONTUAIS\n{st.session_state.conteudo_ajustado_blog}\n\n" if st.session_state.conteudo_ajustado_blog else ""}
 
 ## REFERÊNCIAS
 {st.session_state.relatorio_fontes_blog if st.session_state.relatorio_fontes_blog else 'N/A'}
+
+## ÚLTIMO AJUSTE SOLICITADO
+{st.session_state.ultimo_ajuste_solicitado if st.session_state.ultimo_ajuste_solicitado else 'Nenhum ajuste realizado'}
 """
                 st.download_button(
                     "📦 Pacote Completo",
@@ -2045,77 +2252,9 @@ Diretrizes por Elemento
                     mime="text/plain",
                     use_container_width=True
                 )
-        
-        # ============================================
-        # 11. SEÇÃO DE AJUSTES
-        # ============================================
-        
-        st.markdown("---")
-        st.subheader("🔄 Ajustar Conteúdo")
-        
-        col_ajuste1, col_ajuste2 = st.columns([3, 1])
-        
-        with col_ajuste1:
-            solicitacao_ajuste = st.text_area(
-                "Descreva os ajustes desejados:",
-                placeholder="Exemplos:\n- Aprofunde mais na seção sobre modo de ação dos produtos\n- Adicione mais dados de eficácia com fontes\n- Melhore a narrativa, conectando melhor problema e solução\n- Quebre parágrafos longos no início\n- Inclua mais informações sobre a cultura alvo\n- Aumente a densidade da palavra-chave 'manejo de nematoides'\n- Adicione um CTA mais forte no final",
-                height=100,
-                key="campo_ajuste_blog"
-            )
-        
-        with col_ajuste2:
-            st.markdown("#####")
-            if st.button("✅ APLICAR AJUSTES", type="secondary", use_container_width=True):
-                if solicitacao_ajuste.strip():
-                    with st.spinner("🔄 Aplicando ajustes..."):
-                        try:
-                            # Preparar prompt de ajuste
-                            prompt_ajuste = f"""
-                            ## CONTEÚDO ATUAL:
-                            {st.session_state.conteudo_gerado_blog}
-                            
-                            ## BRIEFING ORIGINAL:
-                            {st.session_state.briefing_original_blog if st.session_state.briefing_original_blog else 'N/A'}
-                            
-                            ## AJUSTES SOLICITADOS:
-                            {solicitacao_ajuste}
-                            
-                            ## INSTRUÇÕES:
-                            1. APLIQUE os ajustes solicitados mantendo a estrutura geral
-                            2. APROFUNDE o conteúdo técnico quando necessário
-                            3. QUEBRE parágrafos longos
-                            4. MANTENHA as fontes e referências
-                            5. MELHORE a narrativa se solicitado
-                            6. POSICIONE os produtos de forma estratégica
-                            
-                            RETORNE APENAS O CONTEÚDO AJUSTADO.
-                            """
-                            
-                            resposta_ajuste = modelo_texto.generate_content(prompt_ajuste)
-                            conteudo_ajustado = resposta_ajuste.text
-                            
-                            # Salvar versão anterior
-                            nova_versao = {
-                                "versao": len(st.session_state.versoes_blog) + 1,
-                                "conteudo": st.session_state.conteudo_gerado_blog,
-                                "data": datetime.datetime.now(),
-                                "descricao": f"Ajuste: {solicitacao_ajuste[:50]}..."
-                            }
-                            st.session_state.versoes_blog.append(nova_versao)
-                            
-                            # Atualizar conteúdo atual
-                            st.session_state.conteudo_gerado_blog = conteudo_ajustado
-                            
-                            st.success("✅ Ajustes aplicados com sucesso!")
-                            st.rerun()
-                            
-                        except Exception as e:
-                            st.error(f"❌ Erro ao aplicar ajustes: {str(e)}")
-                else:
-                    st.warning("⚠️ Descreva os ajustes desejados.")
     
     # ============================================
-    # 12. HISTÓRICO DE GERAÇÕES
+    # 14. HISTÓRICO DE GERAÇÕES
     # ============================================
     
     if mongo_connected_blog_rag:
@@ -2134,6 +2273,7 @@ Diretrizes por Elemento
                         if st.button(f"Carregar este post", key=f"load_{post.get('_id')}"):
                             st.session_state.conteudo_gerado_blog = post.get('conteudo', '')
                             st.session_state.briefing_original_blog = post.get('briefing', '')
+                            st.session_state.conteudo_ajustado_blog = None
                             st.success("✅ Post carregado!")
                             st.rerun()
             else:
