@@ -1743,6 +1743,9 @@ Contexto do mês: Fevereiro - período de desenvolvimento vegetativo da soja no 
                            - EXPLIQUE o modo de ação, não apenas o nome
                            - MOSTRE resultados com dados de eficácia
                            - CONCLUA com recomendações práticas e CTA
+
+                        **6 POSICIONAMENTO DO PRODUTO:
+                            - não apenas descreva o produto; o posicione como solução; construa uma narrativa estratégica sobre seu uso, beneficios, etc
                         
                         ---
                         
