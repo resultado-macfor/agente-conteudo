@@ -3909,7 +3909,9 @@ with tab_briefings:
 
                                 Gere um briefing completo baseado APENAS nesta pauta específica.
                                 Use a base de conhecimento fornecida para identificar produtos, culturas e informações técnicas.
-                                Formato completo com contexto, objetivos e formatos.
+                                Formato completo com contexto, objetivos e formatos. Traga informações chave dos produtos exatamente como são, sem alterar o texto. Mas 
+                                posicione, crie um tema, discorra sobre o produto, agregue o tema, após trazer as informações brutas dos produtos que não deve ser alterada,
+                                o posicione em termos de benefícios, como que ele deve ser discorrido.
 
                                 # [TÍTULO DO BRIEFING]
 
@@ -4060,6 +4062,9 @@ with tab_briefings:
                                 {contexto_individual if contexto_individual else "Nenhum contexto adicional fornecido."}
 
                                 ## INSTRUÇÕES PARA O FORMATO DO BRIEFING:
+                                Traga informações chave dos produtos exatamente como são, sem alterar o texto. Mas 
+                                posicione, crie um tema, discorra sobre o produto, agregue o tema, após trazer as informações brutas dos produtos que não deve ser alterada,
+                                o posicione em termos de benefícios, como que ele deve ser discorrido.
 
                                 Gere um briefing completo seguindo EXATAMENTE esta estrutura:
 
