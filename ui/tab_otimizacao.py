@@ -5,38 +5,78 @@ import streamlit as st
 from docx import Document
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
-from docx.shared import Pt
 from utils.content_utils import construir_contexto, realizar_busca_web_perplexity
 
 
+# Captura [texto](url) ou texto → https://url (ambos os formatos que o modelo pode gerar)
+_LINK_MARKDOWN_RE = re.compile(r'\[([^\]]+)\]\((https?://[^\)\s]+)\)')
+_LINK_SETA_RE = re.compile(r'(.+?)\s*→\s*(https?://\S+)')
+
+
+def _normalizar_links(texto: str) -> str:
+    """Converte 'texto → https://url' para '[texto](https://url)' para processamento uniforme."""
+    def _substituir(m):
+        label = m.group(1).strip().lstrip('- ').strip()
+        url = m.group(2).strip()
+        bullet = '- ' if m.group(0).startswith('- ') else ''
+        return f"{bullet}[{label}]({url})"
+    return _LINK_SETA_RE.sub(_substituir, texto)
+
+
+def _adicionar_hyperlink(paragrafo, texto: str, url: str):
+    """Insere um hyperlink clicável num parágrafo do DOCX."""
+    r_id = paragrafo.part.relate_to(
+        url,
+        'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink',
+        is_external=True,
+    )
+    hyperlink = OxmlElement('w:hyperlink')
+    hyperlink.set(qn('r:id'), r_id)
+
+    run_elem = OxmlElement('w:r')
+    rPr = OxmlElement('w:rPr')
+    color = OxmlElement('w:color')
+    color.set(qn('w:val'), '0563C1')
+    u = OxmlElement('w:u')
+    u.set(qn('w:val'), 'single')
+    rPr.append(color)
+    rPr.append(u)
+    run_elem.append(rPr)
+
+    t = OxmlElement('w:t')
+    t.text = texto
+    run_elem.append(t)
+    hyperlink.append(run_elem)
+    paragrafo._p.append(hyperlink)
+
+
 def _adicionar_paragrafo_com_links(doc, texto: str):
-    """Adiciona um parágrafo ao documento, convertendo [texto](url) em hyperlinks clicáveis."""
-    partes = re.split(r'(\[([^\]]+)\]\((https?://[^\)]+)\))', texto)
-    if len(partes) == 1:
+    """Adiciona parágrafo convertendo [texto](url) em hyperlinks clicáveis."""
+    # normaliza formato seta → markdown antes de processar
+    texto = _normalizar_links(texto)
+
+    segmentos = []
+    ultimo = 0
+    for m in _LINK_MARKDOWN_RE.finditer(texto):
+        if m.start() > ultimo:
+            segmentos.append(('texto', texto[ultimo:m.start()]))
+        segmentos.append(('link', m.group(1), m.group(2)))
+        ultimo = m.end()
+    if ultimo < len(texto):
+        segmentos.append(('texto', texto[ultimo:]))
+
+    # sem nenhum link encontrado — parágrafo simples
+    if all(s[0] == 'texto' for s in segmentos):
         doc.add_paragraph(texto)
         return
 
     p = doc.add_paragraph()
-    for parte in partes:
-        m = re.fullmatch(r'\[([^\]]+)\]\((https?://[^\)]+)\)', parte)
-        if m:
-            link_texto, url = m.group(1), m.group(2)
-            r_id = p.part.relate_to(url, 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink', is_external=True)
-            hyperlink = OxmlElement('w:hyperlink')
-            hyperlink.set(qn('r:id'), r_id)
-            run_elem = OxmlElement('w:r')
-            rPr = OxmlElement('w:rPr')
-            rStyle = OxmlElement('w:rStyle')
-            rStyle.set(qn('w:val'), 'Hyperlink')
-            rPr.append(rStyle)
-            run_elem.append(rPr)
-            t = OxmlElement('w:t')
-            t.text = link_texto
-            run_elem.append(t)
-            hyperlink.append(run_elem)
-            p._p.append(hyperlink)
-        elif parte and not re.search(r'\[([^\]]+)\]\((https?://[^\)]+)\)', parte):
-            run = p.add_run(parte)
+    for seg in segmentos:
+        if seg[0] == 'texto':
+            if seg[1]:
+                p.add_run(seg[1])
+        else:
+            _adicionar_hyperlink(p, seg[1], seg[2])
 
 
 def _gerar_docx(texto: str) -> bytes:
@@ -189,13 +229,16 @@ ALT TEXT CAPA: [texto descritivo com KW]
 - Ancore o link da CTA: [Confira a central de conteúdos Mais Agro](URL do briefing)
 
 ### 7. LINKS ANCORADOS — obrigatório, clicáveis no DOCX e na web
-- Formato: [texto descritivo](URL completa)
+- **Use SEMPRE o formato Markdown:** `[texto descritivo](https://url-completa.com)`
 - Ancore TODOS os links: CTA, interlinks do briefing, fontes web, produtos citados
-- NUNCA escreva URLs cruas no corpo — sempre ancore em texto descritivo
-- Ao final do artigo:
+- NUNCA escreva URLs cruas no corpo do texto
+- NUNCA use o formato `texto → URL` com seta — isso não cria link clicável
+- Exemplo correto no corpo: [Fungicida Miravis Pro](https://portal.syngenta.com.br/produtos/fungicida-miravis-pro)
+- Ao final do artigo, liste também em formato Markdown:
   ```
   LINKS USADOS:
-  - [texto âncora] → URL completa
+  - [Fungicida Miravis Pro](https://portal.syngenta.com.br/produtos/fungicida-miravis-pro)
+  - [Confira a central Mais Agro](https://maisagro.syngenta.com.br/)
   ```
 
 ### 8. TABELAS

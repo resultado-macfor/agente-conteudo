@@ -182,8 +182,15 @@ URL: /[slug-amigavel]
 - Cada seção deve trazer um ângulo ou dado NOVO, complementar ao anterior.
 
 ### LINKS ANCORADOS:
-- Para cada dado ou estatística das fontes web, insira o link ancorado no texto: [texto âncora](URL).
-- Ao final do artigo, liste todas as referências usadas.
+- **Use SEMPRE o formato Markdown:** `[texto descritivo](https://url-completa.com)`
+- NUNCA use o formato `texto → URL` com seta — isso não cria link clicável
+- NUNCA escreva URLs cruas no corpo do texto
+- Exemplo correto: [Pesquisa Embrapa sobre nematoides](https://www.embrapa.br/exemplo)
+- Ao final do artigo, liste as referências também em formato Markdown:
+  ```
+  REFERÊNCIAS:
+  - [Nome da fonte](https://url-da-fonte.com)
+  ```
 
 ### TABELAS:
 - Se o briefing solicitar tabelas, gere-as em Markdown puro (sem HTML, sem estilos inline).
