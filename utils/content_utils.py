@@ -1,10 +1,10 @@
+import re
 import streamlit as st
 from google.genai import types
 from config.settings import GEMINI_API_KEY
 
 
 def construir_contexto(agente, segmentos_selecionados, historico_mensagens=None):
-    """Constrói o contexto com base nos segmentos selecionados do agente."""
     contexto = ""
 
     if "system_prompt" in segmentos_selecionados and agente.get('system_prompt'):
@@ -30,7 +30,6 @@ def construir_contexto(agente, segmentos_selecionados, historico_mensagens=None)
 
 
 def transcrever_audio_video(arquivo, tipo_arquivo):
-    """Transcreve áudio ou vídeo usando a API do Gemini."""
     try:
         import google.generativeai as genai
         client = genai.Client(api_key=GEMINI_API_KEY)
@@ -63,7 +62,6 @@ def transcrever_audio_video(arquivo, tipo_arquivo):
 
 
 def buscar_perplexity(prompt: str, perplexity_client) -> str:
-    """Realiza busca na web usando a biblioteca Perplexity."""
     try:
         response = perplexity_client.chat.completions.create(
             model="sonar",
@@ -76,7 +74,6 @@ def buscar_perplexity(prompt: str, perplexity_client) -> str:
 
 
 def buscar_fontes_para_otimizacao(conteudo: str, tipo: str, tom: str, perplexity_client) -> str:
-    """Busca fontes específicas para otimização de conteúdo agrícola."""
     prompt = f"""
     DADOS TÉCNICOS ATUALIZADOS para este conteúdo:
     {conteudo[:800]}
@@ -85,7 +82,6 @@ def buscar_fontes_para_otimizacao(conteudo: str, tipo: str, tom: str, perplexity
 
 
 def realizar_busca_web_perplexity(texto: str, tipo_otimizacao: str, tom_voz: str) -> str:
-    """Realiza busca web via Perplexity para otimização de conteúdo."""
     try:
         from perplexity import Perplexity
         import os
@@ -126,7 +122,9 @@ def realizar_busca_web_perplexity(texto: str, tipo_otimizacao: str, tom_voz: str
         )
 
         if response and response.choices:
-            return response.choices[0].message.content
+            resultado = response.choices[0].message.content
+            resultado = re.sub(r'\s*\[\d+\]', '', resultado)
+            return resultado
         return "❌ ERRO: Nenhuma resposta recebida do Perplexity"
 
     except ImportError as e:

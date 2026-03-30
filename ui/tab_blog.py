@@ -100,7 +100,7 @@ Observações importantes:
                         palavras_chave_lista = [p.strip() for p in palavras_chave_input.split(',') if p.strip()] if palavras_chave_input else []
                         palavras_primeira_linha_lista = [p.strip() for p in palavras_primeira_linha.split(',') if p.strip()] if palavras_primeira_linha else []
 
-                        # Busca Perplexity
+                        
                         resultados_perplexity = {"resultado": None, "fontes": [], "erro": None}
                         if usar_perplexity_blog:
                             with st.spinner("🌐 Buscando informações atualizadas na web..."):
@@ -126,7 +126,7 @@ Observações importantes:
                         if m:
                             nivel_h_corpo = f"H{m.group(1)}"
 
-                        prompt_geracao_blog = f"""Você é um redator técnico especializado em agronegócio.
+                        prompt_geracao_blog = f"""Você é um redator técnico especializado em agronegócio, escrevendo para o portal Mais Agro da Syngenta.
 
 {f"###CONTEXTO DO AGENTE###\\n{contexto_agente}\\n###FIM DO CONTEXTO###\\n" if contexto_agente else ""}
 
@@ -158,48 +158,75 @@ Observações importantes:
 META TITLE: [até 60 caracteres, com KW principal]
 META DESCRIPTION: [até 155 caracteres, com KW e chamada para ação]
 URL: /[slug-amigavel]
+CATEGORIA: [categoria sugerida]
+ALT TEXT CAPA: [texto descritivo com KW]
 ```
 
-### ESTRUTURA DO ARTIGO:
-- Siga EXATAMENTE as seções e tópicos descritos no briefing. NÃO adicione seções não previstas.
-- Use o nível {nivel_h_corpo} como primeiro heading do corpo (conforme briefing). Mantenha a hierarquia consistente em todo o texto.
-- O H1 deve ser exatamente o título indicado no briefing.
+### ESTRUTURA EXATA DO ARTIGO — siga esta ordem:
 
-### INTRODUÇÃO:
-- PROIBIDO começar com frases genéricas sobre "o dinâmico cenário do agronegócio" ou variações.
-- PROIBIDO apresentar o público-alvo explicitamente na introdução ("Se você é produtor...", "Este guia é para...").
-- A introdução deve entrar direto no problema ou tema do artigo, de forma específica e factual.
+**Bloco 1 — Introdução:**
+- 2 a 3 parágrafos diretos e factuais sobre o tema
 
-### ESCANEABILIDADE:
-- Parágrafos com NO MÁXIMO 3 frases curtas.
-- Frases curtas e diretas — máximo 20 palavras por frase sempre que possível.
-- Use bullet points (listas com `-`) para enumerações de 3 ou mais itens.
-- Negrito apenas em termos técnicos ou informações-chave.
+**Bloco 2 — Corpo do artigo:**
+- Use exatamente as seções {nivel_h_corpo} listadas no briefing, nessa ordem
+- Cada seção: 2 a 4 parágrafos + bullets quando há 3 ou mais itens paralelos
+- Bullets com termo em negrito: `- **Termo:** explicação da característica`
+- Listas numeradas para sequências de etapas (1. 2. 3.)
 
-### UNICIDADE DAS INFORMAÇÕES:
-- Cada informação deve aparecer UMA única vez no texto.
-- Não repita dados, conclusões ou argumentos em seções diferentes.
-- Cada seção deve trazer um ângulo ou dado NOVO, complementar ao anterior.
+**Bloco 3 — Produtos Syngenta recomendados:**
+- Seção com heading próprio ao final do corpo (antes da CTA)
+- Mencione nome comercial + registro (ex: CALARIS®, Dual Gold®, Grover®)
+- Tom institucional: "A Syngenta oferece qualidade e tecnologia..."
 
-### LINKS ANCORADOS:
-- **Use SEMPRE o formato Markdown:** `[texto descritivo](https://url-completa.com)`
-- NUNCA use o formato `texto → URL` com seta — isso não cria link clicável
-- NUNCA escreva URLs cruas no corpo do texto
-- Exemplo correto: [Pesquisa Embrapa sobre nematoides](https://www.embrapa.br/exemplo)
-- Ao final do artigo, liste as referências também em formato Markdown:
-  ```
-  REFERÊNCIAS:
-  - [Nome da fonte](https://url-da-fonte.com)
-  ```
+**Bloco 4 — CTA final:**
+- Insira a CTA do briefing
+- Última frase: "Confira a central de conteúdos [Mais Agro](URL-da-CTA) para ficar por dentro de tudo o que está acontecendo no campo."
+
+### INTRODUÇÃO — PROIBIÇÕES:
+- PROIBIDO: "No dinâmico cenário do agronegócio...", "No contexto atual...", qualquer abertura genérica
+- PROIBIDO: apresentar o leitor ("Se você é produtor...", "Este guia é para...")
+- PROIBIDO: frases meta ("Neste artigo, vamos explorar...", "Ao longo deste conteúdo...")
+- OBRIGATÓRIO: comece com dado factual, afirmação direta ou contexto imediato do tema
+
+### QUALIDADE TEXTUAL:
+- Parágrafos com NO MÁXIMO 3 frases curtas (~20 palavras por frase)
+- Negrito (`**texto**`) em: termo técnico na 1ª ocorrência, dados-chave, nome do item em bullet
+- A KW principal em negrito SOMENTE na primeira vez — nas demais, sem negrito
+- Cada informação aparece UMA única vez — não repita entre seções
+
+### LINKS — regras obrigatórias:
+**Formato:** SEMPRE Markdown `[texto descritivo](https://url-completa.com)`
+
+**PROIBIDO:**
+- URLs cruas no corpo do texto
+- Formato `texto → URL` com seta
+- Numeração estilo Wikipedia `[1]`, `[2]`
+- Qualquer empresa agroquímica que não seja Syngenta: BASF, Bayer, Corteva, FMC, UPL, Adama, Helm, Nufarm
+
+**Links internos (Mais Agro) — 3 a 4 obrigatórios distribuídos no corpo:**
+- Ancore cada link no parágrafo onde o tema é mencionado, dentro da frase
+- Exemplo correto: O [manejo integrado de plantas daninhas](https://maisagro.syngenta.com.br/manejo-plantas-daninhas) combina práticas culturais e químicas para reduzir o banco de sementes no solo.
+- Exemplo errado: lista de links no final ou agrupados numa seção separada
+- Use URLs no padrão `https://maisagro.syngenta.com.br/[slug-do-tema]`
+
+**Links externos — 2 a 3 obrigatórios no corpo:**
+- Somente fontes neutras: Embrapa, universidades, institutos governamentais
+- Ancore no dado/estudo: `De acordo com [pesquisa da Embrapa Soja](https://www.embrapa.br/...), a espécie...`
+- NUNCA "clique aqui" ou anchor genérica
+
+### FORMATAÇÃO — PROIBIÇÕES ABSOLUTAS:
+**NUNCA use tags HTML**: `<strong>`, `<em>`, `<b>`, `<i>`, `<a>`, `<br>`, `<p>`, `<ul>`, `<li>`, `<h1>` etc.
+Use EXCLUSIVAMENTE Markdown puro: `**negrito**`, `[link](url)`, `## Heading`, `- item`, `1. item`.
 
 ### TABELAS:
-- Se o briefing solicitar tabelas, gere-as em Markdown puro (sem HTML, sem estilos inline).
-- Exemplo de formato correto:
+- Markdown puro — nunca HTML:
   | Coluna 1 | Coluna 2 |
   |----------|----------|
   | Dado A   | Dado B   |
 
 ---
+**LEMBRETE FINAL:** Markdown puro, zero HTML, zero `[n]` Wikipedia, zero concorrentes Syngenta, links internos ancorados nos parágrafos onde o tema é discutido, CTA com link âncora no final.
+
 Gere o artigo completo seguindo todas as regras acima.
 """
 
@@ -336,7 +363,7 @@ Gere o artigo completo seguindo todas as regras acima.
                     if solicitacao_ajuste.strip():
                         with st.spinner("🔄 Aplicando ajustes..."):
                             try:
-                                prompt_ajuste = f"""Você é um redator técnico especializado em agronegócio.
+                                prompt_ajuste = f"""Você é um redator técnico especializado em agronegócio, escrevendo para o portal Mais Agro da Syngenta.
 
 ## CONTEÚDO ATUAL:
 {st.session_state.conteudo_gerado_blog}
@@ -347,13 +374,16 @@ Gere o artigo completo seguindo todas as regras acima.
 ## AJUSTES SOLICITADOS:
 {solicitacao_ajuste}
 
-## REGRAS PARA APLICAR OS AJUSTES:
-- Mantenha os metadados SEO (META TITLE, META DESCRIPTION, URL) no topo.
-- Mantenha a hierarquia de headings existente.
-- Parágrafos com no máximo 3 frases curtas.
-- Não repita informações já presentes em outras seções.
-- Mantenha links ancorados e referências.
-- NÃO adicione seções fora do briefing original.
+## REGRAS PARA APLICAR OS AJUSTES — mantenha INTEGRALMENTE:
+- Metadados SEO (META TITLE, META DESCRIPTION, URL, CATEGORIA, ALT TEXT) no topo
+- Hierarquia de headings existente (não altere os níveis)
+- Parágrafos com no máximo 3 frases curtas
+- Bullets com `**Termo:** explicação`
+- Links ancorados distribuídos no corpo (não agrupe no final)
+- Seção de produtos Syngenta recomendados
+- CTA final com link âncora para o Mais Agro
+- Markdown puro — zero tags HTML, zero citações `[n]`, zero concorrentes Syngenta
+- NÃO adicione seções fora do briefing original
 
 RETORNE O CONTEÚDO COMPLETO COM OS AJUSTES APLICADOS.
 """
@@ -446,6 +476,8 @@ def _buscar_perplexity_blog(briefing: str, profundidade: str) -> dict:
 
         if response and response.choices:
             resultado = response.choices[0].message.content
+            # Remove citações numéricas estilo Wikipedia [1], [2], [9] etc.
+            resultado = re.sub(r'\s*\[\d+\]', '', resultado)
 
             fontes = []
             for linha in resultado.split('\n'):
