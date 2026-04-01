@@ -12,8 +12,12 @@ export class AgentsService {
   ) {}
 
   async listar(user: string): Promise<AgentDocument[]> {
-    const query = user === 'admin' ? { ativo: true } : { ativo: true, criado_por: user };
-    return this.agentModel.find(query).sort({ createdAt: -1 });
+    const query = user === 'admin' ? { ativo: true } : { 
+      ativo: true, criado_por: user 
+    };
+    return this.agentModel.find(query).sort({
+       createdAt: -1 
+      });
   }
 
   async listarParaHeranca(user: string, agenteAtualId?: string): Promise<AgentDocument[]> {

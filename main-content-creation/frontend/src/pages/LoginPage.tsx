@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bot, Lock, User, ArrowRight, AlertCircle } from 'lucide-react';
+import { Lock, User, ArrowRight, AlertCircle } from 'lucide-react';
 import api from '../api/client';
 import { useStore } from '../store/useStore';
 import Logo from '../assets/macLogo.png'

@@ -1,5 +1,5 @@
 {
-  "name": "backend",
+  "name": "backend-content-creator",
   "version": "0.0.1",
   "description": "",
   "author": "",
@@ -32,6 +32,8 @@
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
+    "docx": "^9.6.1",
+    "exceljs": "^4.4.0",
     "jszip": "^3.10.1",
     "mammoth": "^1.12.0",
     "mongoose": "^9.3.3",

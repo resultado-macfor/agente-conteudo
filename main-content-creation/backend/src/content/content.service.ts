@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { RagService } from '../rag/rag.service';
+import { HistoricoGeracao, HistoricoGeracaoDocument } from '../common/schemas/historico-geracao.schema';
 import axios from 'axios';
 
 @Injectable()
@@ -11,8 +14,62 @@ export class ContentService {
   constructor(
     private config: ConfigService,
     private ragService: RagService,
+    @InjectModel(HistoricoGeracao.name, 'briefings')
+    private historicoModel: Model<HistoricoGeracaoDocument>,
   ) {
     this.genAI = new GoogleGenerativeAI(config.get<string>('GEM_API_KEY') ?? '');
+  }
+
+  async listarHistoricoGeracao(limite = 5): Promise<HistoricoGeracaoDocument[]> {
+    return this.historicoModel.find().sort({ createdAt: -1 }).limit(limite);
+  }
+
+  // Transcrição de áudio/vídeo via Gemini — igual ao Python legado
+  async transcreverMidia(buffer: Buffer, mimeType: string): Promise<string> {
+    const apiKey = this.config.get<string>('GEM_API_KEY') ?? '';
+    // Para arquivos <= 20MB usa inline data; acima usa File API
+    const MAX_INLINE = 20 * 1024 * 1024;
+    try {
+      if (buffer.length <= MAX_INLINE) {
+        const base64 = buffer.toString('base64');
+        const response = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+          {
+            contents: [{
+              parts: [
+                { text: 'Transcreva este arquivo em detalhes:' },
+                { inline_data: { mime_type: mimeType, data: base64 } },
+              ],
+            }],
+          },
+          { headers: { 'Content-Type': 'application/json' } },
+        );
+        return response.data.candidates?.[0]?.content?.parts?.[0]?.text ?? 'Sem transcrição';
+      } else {
+        // Upload via File API
+        const uploadRes = await axios.post(
+          `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`,
+          buffer,
+          { headers: { 'Content-Type': mimeType, 'X-Goog-Upload-Protocol': 'raw' } },
+        );
+        const fileUri = uploadRes.data.file?.uri;
+        const response = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+          {
+            contents: [{
+              parts: [
+                { text: 'Transcreva este arquivo em detalhes:' },
+                { file_data: { mime_type: mimeType, file_uri: fileUri } },
+              ],
+            }],
+          },
+          { headers: { 'Content-Type': 'application/json' } },
+        );
+        return response.data.candidates?.[0]?.content?.parts?.[0]?.text ?? 'Sem transcrição';
+      }
+    } catch (e: unknown) {
+      return `Erro na transcrição: ${(e as Error).message}`;
+    }
   }
 
   async gerarConteudo(body: {
@@ -31,22 +88,48 @@ export class ContentService {
     const prompt = `${body.contextoAgente}
 
 ## INSTRUÇÕES PARA GERAÇÃO DE CONTEÚDO:
+
 **TIPO DE CONTEÚDO:** ${body.tipoConteudo}
 **TOM DE VOZ:** ${body.tomVoz}
 **PALAVRAS-CHAVE:** ${body.palavrasChave || 'Não especificadas'}
 **NÚMERO DE PALAVRAS:** ${body.numeroPalavras} (±10%)
 **NÍVEL DE DETALHE:** ${body.nivelDetalhe}
 **INCLUIR CALL-TO-ACTION:** ${body.incluirCta}
-**INSTRUÇÕES ESPECÍFICAS:** ${body.instrucoes || 'Nenhuma'}
+
+**INSTRUÇÕES ESPECÍFICAS:**
+${body.instrucoes || 'Nenhuma instrução específica fornecida.'}
 
 ## FONTES E REFERÊNCIAS:
 ${body.fontesTexto}
 
 ## TAREFA:
-Gere um conteúdo do tipo ${body.tipoConteudo} sintetizando todas as fontes acima. Formato de saída: ${body.formatoSaida}.`;
+Com base em TODAS as fontes fornecidas acima, gere um conteúdo do tipo ${body.tipoConteudo} que:
+1. **Síntese Eficiente:** Combine e sintetize informações de todas as fontes
+2. **Coerência:** Mantenha consistência com as informações originais
+3. **Valor Agregado:** Vá além da simples cópia, agregando insights
+4. **Engajamento:** Crie conteúdo que engaje o público-alvo
+5. **Clareza:** Comunique ideias complexas de forma acessível
+
+**FORMATO DE SAÍDA:** ${body.formatoSaida}
+
+Gere um conteúdo completo e profissional.`;
 
     const result = await model.generateContent(prompt);
-    return result.response.text();
+    const conteudo = result.response.text();
+
+    // Salva no histórico (igual ao Python legado — briefings_Broto_Tecnologia.historico_geracao)
+    try {
+      await this.historicoModel.create({
+        tipo_conteudo: body.tipoConteudo,
+        tom_voz: body.tomVoz,
+        palavras_chave: body.palavrasChave,
+        numero_palavras: body.numeroPalavras,
+        conteudo_gerado: conteudo,
+        fontes_utilizadas: { fontesTexto: body.fontesTexto?.slice(0, 200) },
+      });
+    } catch { /* silencioso — não impede a resposta */ }
+
+    return conteudo;
   }
 
   async revisaoOrtografica(texto: string, contextoAgente: string): Promise<string> {
@@ -222,6 +305,30 @@ INSTRUÇÕES:
 4. Inclua um relatório estruturado das mudanças ao final`;
 
     const result = await model.generateContent(textoBase);
+    return result.response.text();
+  }
+
+  async ajusteRevisaoRag(body: { textoOriginal: string; textoReescrito: string; ajuste: string }): Promise<string> {
+    // Usa gemini-2.5-pro, igual ao modelo_texto2 do Python legado
+    const model = this.genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
+    const prompt = `VOCÊ É: Um especialista técnico agrícola.
+SUA TAREFA: Ajustar a revisão técnica anterior com base nas solicitações específicas.
+
+TEXTO ORIGINAL:
+${body.textoOriginal}
+
+TEXTO REESCRITO COM RAGs:
+${body.textoReescrito}
+
+SOLICITAÇÕES DE AJUSTE:
+${body.ajuste}
+
+INSTRUÇÕES:
+1. Aplique TODOS os ajustes solicitados
+2. Mantenha a precisão técnica
+3. Retorne o texto reescrito ajustado.`;
+
+    const result = await model.generateContent(prompt);
     return result.response.text();
   }
 

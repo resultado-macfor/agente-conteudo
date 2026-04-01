@@ -109,7 +109,7 @@ export default function TabConteudo() {
             </div>
             {briefingsDB.length > 0 ? (
               <select
-                className="w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-200 outline-none focus:border-violet-500/60"
+                className="w-full rounded-xl px-5.5 py-2.5 text-sm text-slate-200 outline-none focus:border-violet-500/60"
                 style={{ background: '#1d1d1f'}}
                 value={briefingDBSelecionado}
                 onChange={(e) => setBriefingDBSelecionado(e.target.value)}
